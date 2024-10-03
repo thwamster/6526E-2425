@@ -1,11 +1,32 @@
 #include "main.h"
 
+/* Global Objects */
+// Constant Intervals
+const int waitInterval = 10;
+const int maxInterval = 100;
 
-/**
- * A callback function for LLEMU's center button.
- *
- * When this callback is fired, it will toggle line 2 of the LCD text between
- * "I was pressed!" and nothing.
+// Tasks
+pros::Mutex mutex;
+pros::Task inputs;
+pros::Task drive;
+
+// Electronics
+pros::Controller master;
+pros::MotorGroup leftDriveMotors({-2, -9});
+pros::MotorGroup rightDriveMotors({1, 10});
+pros::ADIDigitalOut backPistons('A');
+
+// Target & Sensor Variables
+int leftDriveTarget;
+int rightDriveTarget;
+bool pistonTarget;
+
+int leftInertialSensor;
+int rightInertialSensor;
+
+/* Competition Methods */
+/* 
+ * TODO
  */
 void on_center_button() {
 	static bool pressed = false;
@@ -17,102 +38,149 @@ void on_center_button() {
 	}
 }
 
-/**
- * Runs initialization code. This occurs as soon as the program is started.
- *
- * All other competition modes are blocked by initialize; it is recommended
- * to keep execution time for this mode under a few seconds.
+/* 
+ * TODO
  */
 void initialize() {
 	pros::lcd::initialize();
 	pros::lcd::set_text(1, "Initialized.");
-
 	pros::lcd::register_btn1_cb(on_center_button);
+
+	mutex.take(maxInterval); // Begin Exclusivity
+
+	// Initialize Variables
+	leftDriveTarget = 0;
+	rightDriveTarget = 0;
+	pistonTarget = false;
+
+	leftInertialSensor = 0;
+	rightInertialSensor = 0;
+
+	// Initialize Tasks
+	inputs = pros::Task::create(opcontrol);
+	inputs.suspend();
+	drive.suspend();
+	inputs = pros::Task::create(driveControlSystem);
+
+	mutex.give(); // End Exclusivity
 }
 
-/**
- * Runs while the robot is in the disabled state of Field Management System or
- * the VEX Competition Switch, following either autonomous or opcontrol. When
- * the robot is enabled, this task will exit.
+/* 
+ * TODO
  */
-void disabled() {}
+void disabled() {
+	inputs.suspend();
+	drive.suspend();
+}
 
-/**
- * Runs after initialize(), and before autonomous when connected to the Field
- * Management System or the VEX Competition Switch. This is intended for
- * competition-specific initialization routines, such as an autonomous selector
- * on the LCD.
- *
- * This task will exit when the robot is enabled and autonomous or opcontrol
- * starts.
+/* 
+ * TODO
  */
 void competition_initialize() {}
 
-/**
- * Runs the user autonomous code. This function will be started in its own task
- * with the default priority and stack size whenever the robot is enabled via
- * the Field Management System or the VEX Competition Switch in the autonomous
- * mode. Alternatively, this function may be called in initialize or opcontrol
- * for non-competition testing purposes.
- *
- * If the robot is disabled or communications is lost, the autonomous task
- * will be stopped. Re-enabling the robot will restart the task, not re-start it
- * from where it left off.
+/* 
+ * TODO
  */
 void autonomous() {}
 
-/**
- * Runs the operator control code. This function will be started in its own task
- * with the default priority and stack size whenever the robot is enabled via
- * the Field Management System or the VEX Competition Switch in the operator
- * control mode.
- *
- * If no competition control is connected, this function will run immediately
- * following initialize().
- *
- * If the robot is disabled or communications is lost, the
- * operator control task will be stopped. Re-enabling the robot will restart the
- * task, not resume it from where it left off.
+/* 
+ * TODO
  */
 void opcontrol() {
-	// Declarations
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
-	pros::MotorGroup leftDriveMotors({-2, -9});
-	pros::MotorGroup rightDriveMotors({1, 10});
-	pros::ADIDigitalOut backPistons('A');
+	inputs.resume();
+	drive.resume();
 
-	int leftStickInput;
-	int rightStickInput;
-	int upInput;
-	int downInput;
+	while (true) {
+		pros::lcd::set_text(1, "Under operator control.");
+	}
+}
 
+/* Control Methods */
+/* 
+ * TODO
+ */
+void getInputs() {
+	int leftStick = 0;
+	int rightStick = 0;
+	int upButton = 0;
+	int downButton = 0;
 
 	// Operator Control Loop
 	while (true) {
-		// Debug
-		pros::lcd::set_text(1, "Under operator control.");
 
-		// Recieves Inputs
-		leftStickInput = master.get_analog(ANALOG_LEFT_Y);
-		rightStickInput = master.get_analog(ANALOG_RIGHT_Y);
-		upInput = master.get_digital(DIGITAL_UP);
-		downInput = master.get_digital(DIGITAL_DOWN);
+		// Receives Inputs
+		leftStick = master.get_analog(ANALOG_LEFT_Y);
+		rightStick = master.get_analog(ANALOG_RIGHT_Y);
+		upButton = master.get_digital(DIGITAL_UP);
+		downButton = master.get_digital(DIGITAL_DOWN);
 
-		// Drivetrain
-		leftDriveMotors.move(leftStickInput);
-		rightDriveMotors.move(rightStickInput);
+		// Receives Sensors
+		leftInertialSensor = 0; // TODO
+		rightInertialSensor = 0; // TODO
 
-		// Pneumatics
-		if (upInput && !downInput) {
-			backPistons.set_value(true);
-			pros::lcd::print(1, "Pneumatics on.");
+		// Sets Targets
+		mutex.take(maxInterval); // Begin Exclusivity
+
+		leftDriveTarget = leftStick;
+		rightDriveTarget = rightStick;
+
+		if (upButton == 1 && downButton == 0) {
+			pistonTarget = true;
 		}
-		else if (downInput && !upInput) {
-			backPistons.set_value(false);
-			pros::lcd::print(1, "Pneumatics off.");
+		else if (upButton == 0 && downButton == 1) {
+			pistonTarget = false;
 		}
+
+		mutex.give(); // End Exclusivity
 
 		// Wait
-		pros::delay(20);
+		pros::delay(waitInterval);
 	}
+}
+
+/* 
+ * TODO
+ */
+void driveControlSystem() {
+	int rightDriveI = 0;
+	int rightDriveLastError = 0;
+
+	int leftDriveI = 0;
+	int leftDriveLastError = 0;
+
+	// Drive Control System Loop
+	while (true) {
+
+		// Sets Electronics
+		mutex.take(maxInterval); // Begin Exclusivity
+		
+		rightDriveMotors.move(PID(rightDriveTarget, rightInertialSensor, 1, 0, 0, &rightDriveI, 10, &rightDriveLastError));
+		rightDriveMotors.move(PID(leftDriveTarget, leftInertialSensor, 1, 0, 0, &leftDriveI, 10, &leftDriveLastError));
+		backPistons.set_value(pistonTarget);
+
+		mutex.give(); // End Exclusivity
+
+		// Wait
+		pros::delay(waitInterval);
+	}
+}
+
+/* 
+ * TODO
+ */
+int PID(int target, int sensor, int kP, int kI, int kD, int* I, int limitI, int* lastError) {
+	int PID = 0;
+	int error = target - sensor;
+
+	if (abs(error) < limitI) {
+		*I += error;
+	}
+	else {
+		*I = 0;
+	}
+
+	PID = (kP * error) + (kI + *I) + (kD * error - *lastError);
+	*lastError = error;
+
+	return PID;
 }
