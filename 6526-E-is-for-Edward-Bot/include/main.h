@@ -66,6 +66,9 @@ void initialize(void);
 void disabled(void);
 void competition_initialize(void);
 void opcontrol(void);
+void getInputs(void);
+void driveControlSystem(void);
+int PID(int target, int sensor, int kP, int kI, int kD, int* I, int limitI, int* lastError);
 #ifdef __cplusplus
 }
 #endif
