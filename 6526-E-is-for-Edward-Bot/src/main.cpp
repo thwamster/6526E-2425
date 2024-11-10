@@ -3,15 +3,16 @@ using namespace pros;
 
 /* Global Objects */
 // Constant Intervals
-const int waitInterval = 12; //wait 12 ms
+const int waitInterval = 12;
 const int maxInterval = 100;
-
+const int doubleInputDelay = 200;
 
 // Tasks
 Mutex mutex;
 
-// Electronics
 /* 
+ * Electronics
+ *
  * Drivetrain: 
  * 	  left front: port 10
  * 	  left back: port 9
@@ -22,13 +23,13 @@ Mutex mutex;
  * 	  intake: port 7 
  * 	  score: port 8
  * 
- * Fourbar
+ * Fourbar:
  * 	  left: port 16
  * 	  right port 17
  * 
- * Inertia sensors:
- * 	  left side: port X
- * 	  right side: port X
+ * Inertial Sensors:
+ * 	  left side: port 2
+ * 	  right side: port 1
  * 
  * Radio: port 21
  * 
@@ -37,43 +38,47 @@ Mutex mutex;
  * Fourbar encoders: 
  * 
  */
-
+// Controller
 Controller master(E_CONTROLLER_MASTER);
 
-//drive
+// Drive Motors
 MotorGroup leftDriveMotors({-9, -10});
 MotorGroup rightDriveMotors({1,2});
 
-//intake and score mech
-Motor intake(7);
-Motor score(8);
+// Intake and Score Mechanism
+Motor intakeMotor(7);
+Motor scoreMotor(8);
 
-//fourbar
-Motor fourbarMotorR (16);
-Motor fourbarMotorL (-17);
+// Fourbar Mechanism
+Motor rightFourbarMotor (16);
+Motor leftFourbarMotor (-17);
 
-//clamp
+// Clamp Mechanism
 adi::Pneumatics clampPistons (1, true);
 
-// Target & Sensor Variables
-//*o7 note: so these are global vars that are given values in the getInputs func and then 
-//used to intiate function in the controls func. Technically, we can just use the raw inputs instead and make the vars
-//that said inputs are stored in global.
+// Sensors
+pros::Imu leftInertialSensor(19);
+pros::Imu rightInertialSensor(20);
+
+/* Target & Sensor Variables */
+
+// *o7 note: so these are global vars that are given values in the getInputs func and then 
+// used to intiate function in the controls func. Technically, we can just use the raw inputs instead and make the vars
+// that said inputs are stored in global.
+
 // Initialize Variables
 int leftDriveTarget{};
 int rightDriveTarget{};
-
 bool enablePID{false};
-int leftInertialSensor{};
-int rightInertialSensor{};
-
 bool pistonTarget{false};
 int intakeScoreTarget{};
-int fourbarTarget {};
+int fourbarTarget{};
+int leftDriveActual;
+int rightDriveActual;
 
 /* Competition Methods */
 /* 
- * TODO
+ * Center Button reaction method.
  */
 void on_center_button() {
 	static bool pressed = false;
@@ -86,49 +91,47 @@ void on_center_button() {
 }
 
 /* 
- * TODO
+ * Initialization Method.
  */
 void initialize() {
 	lcd::initialize();
 	lcd::set_text(1, "Initialized.");
-//	mutex.take(maxInterval); // Begin Exclusivity !o7: you could probs remove mutex if the var initialization didn't matter
-//
-//	// original Initialize Variables !o7: double check that you didn't fuck it up by moving the initialization
-//
-//	// Initialize Tasks
-//	mutex.give(); // End Exclusivity
+		
+	//	mutex.take(maxInterval); // Begin Exclusivity !o7: you could probs remove mutex if the var initialization didn't matter
+	//
+	//	// original Initialize Variables !o7: double check that you didn't fuck it up by moving the initialization
+	//
+	//	// Initialize Tasks
+	//	mutex.give(); // End Exclusivity
+
 	lcd::register_btn1_cb(on_center_button);
 }
 
 /* 
- * TODO
+ * Disabled state. Unused.
  */
-void disabled() {
-}
+void disabled() {}
 
 /* 
- * TODO
+ * Competition initialization method. Unused.
  */
 void competition_initialize() {}
 
 /* 
- * TODO
+ * Autonomous control method.
  */
 void autonomous() {
-
 	leftDriveMotors.move(127);
 	rightDriveMotors.move(127);
-
 	delay(2000);
 
 	leftDriveMotors.move(-127);
 	rightDriveMotors.move(127);
-
 	delay (500);
 }
 
 /* 
- * TODO
+ * Operator control method.
  */
 void opcontrol() {
 	Task inputs(getInputs);
@@ -144,32 +147,32 @@ void opcontrol() {
 
 /* Control Methods */
 /* 
- * TODO
+ * Receives inputs from controllers and sensors and updates global variables.
  */
 void getInputs() {
-	
-	//create and intitialize vars to store controller input data and enable functions 
-	const int doubleInputDelay = 200;
+	// Tank Drive Joysticks
+	int leftStick{};
+	int rightStick{};
 
-	//tank drive joysticks
-	int leftStick {};
-	int rightStick {};
+	// Drive PID buttons and delay for said button 
+	int aButton{};
+	int aDelayCount{};
 
-	//Drive PID buttons and delay 
-	int aButton {};
-	int aDelayCount {};
+	// Clamp piston buttons
+	int upButton{};
+	int downButton{};
 
-	//clamp piston buttons
-	int upButton {};
-	int downButton {};
+	// Intake-score buttons
+	int r1Bumper{};
+	int r2Bumper{};
 
-	//intake-score buttons
-	int rBumper1 {};
-	int rBumper2 {};
+	// Fourbar buttons
+	int l1Bumper{};
+	int l2Bumper{};
 
-	//fourbar buttons
-	int lBumper1 {};
-	int lBumper2 {};
+	// Sensors
+	double leftVelocity{};
+	double rightVelocity{};
 
 	// Input and Electronics Loop
 	while (true) {
@@ -177,46 +180,50 @@ void getInputs() {
 
 		// Receives Inputs
 
-		//drive joystick inputs
+		// Drive joystick inputs
 		leftStick = master.get_analog(ANALOG_LEFT_Y);
 		rightStick = master.get_analog(ANALOG_RIGHT_Y);
 
-		//clamp pistons buttons inputs
+		// Clamp pistons buttons inputs
 		upButton = master.get_digital(DIGITAL_UP);
 		downButton = master.get_digital(DIGITAL_DOWN);
 
-		//intake-score button imputs
-		rBumper1 = master.get_digital(DIGITAL_R1);
-		rBumper2 = master.get_digital(DIGITAL_R2);
+		// Intake-score button imputs
+		r1Bumper = master.get_digital(DIGITAL_R1);
+		r2Bumper = master.get_digital(DIGITAL_R2);
 
-		//fourbar inputs
-		lBumper1 = master.get_digital(DIGITAL_L1);
-		lBumper2 = master.get_digital(DIGITAL_L2);
+		// Fourbar inputs
+		l1Bumper = master.get_digital(DIGITAL_L1);
+		l2Bumper = master.get_digital(DIGITAL_L2);
 
-		//enable/disable PID
+		// Enable/disable PID
 		aButton = master.get_digital(DIGITAL_A);
 
 		// Receives Sensors
-		leftInertialSensor = 0; // TODO
-		rightInertialSensor = 0; // TODO
+		leftVelocity = leftInertialSensor.get_accel().y;
+		rightVelocity = -1 * rightInertialSensor.get_accel().y;
 
-
-		// Set Targets
-
+		// Sets Targets
 		mutex.take(maxInterval); // Begin Exclusivity
 
-		//drive input to target
+		// Drive input to target
 		leftDriveTarget = leftStick;
 		rightDriveTarget = rightStick;
 
-		//Enable drive PID input
+		// Enable drive PID input. Unused.
 		if (aButton == 1 && aDelayCount >= doubleInputDelay && false) {
 			enablePID = !enablePID;
 			aDelayCount = 0;
-			lcd::set_text(5, "PID enabled.");
+			
+			if (enablePID) {
+				lcd::set_text(5, "PID enabled.");
+			}
+			else {
+				lcd::set_text(5, "PID disabled.");
+			}
 		}
 
-		//piston on/off
+		// Piston on/off
 		if (upButton == 1 && downButton == 0) {
 			pistonTarget = true;
 			lcd::set_text(4, "Pneumatics enabled.");
@@ -226,34 +233,32 @@ void getInputs() {
 			lcd::set_text(4, "Pneumatics disabled.");
 		}
 
-		//intake-score on/off
-		if (rBumper1==1 && rBumper2 == 0)
-		{
+		// Intake-score on/off
+		if (r1Bumper == 1 && r2Bumper == 0) {
 			intakeScoreTarget = 1;
-			lcd::set_text(6, "intake forward (intake).");
-		}else if (rBumper1==0 && rBumper2==1)
-		{
+			lcd::set_text(6, "Intake forward (intake).");
+		}
+		else if (r1Bumper == 0 && r2Bumper == 1) {
 			intakeScoreTarget = 2;
-			lcd::set_text(6,"intake reverse (output)");
-		}else
-		{
-			intakeScoreTarget=0;
-			lcd::set_text(6, "intake off");
+			lcd::set_text(6,"Intake reverse (output)");
+		}
+		else {
+			intakeScoreTarget = 0;
+			lcd::set_text(6, "Intake off");
 		}
 
 		//fourbar on/off
-		if (lBumper1==1 && lBumper2 == 0)
-		{
+		if (l1Bumper == 1 && l2Bumper == 0) {
 			fourbarTarget = 1;
-			lcd::set_text(7, "fourbar up (forward).");
-		}else if (lBumper1==0 && lBumper2==1)
-		{
+			lcd::set_text(7, "Fourbar up (forward).");
+		}
+		else if (l1Bumper == 0 && l2Bumper == 1) {
 			fourbarTarget = 2;
-			lcd::set_text(7,"fourbar down (reverse)");
-		}else
-		{
-			fourbarTarget=0;
-			lcd::set_text(7, "fourbar off");
+			lcd::set_text(7,"Fourbar down (reverse).");
+		}
+		else {
+			fourbarTarget = 0;
+			lcd::set_text(7, "Fourbar off.");
 		}
 
 		mutex.give(); // End Exclusivity
@@ -265,7 +270,7 @@ void getInputs() {
 }
 
 /* 
- * TODO
+ * Driver control system. Updates motors and electronics from target variables.
  */
 void driveControlSystem() {
 	int rightDriveI = 0;
@@ -281,10 +286,10 @@ void driveControlSystem() {
 		// Sets Electronics
 		mutex.take(maxInterval); // Begin Exclusivity
 
-		//Drive Movement
-		if (enablePID) {		//Drive PID alteration
-			rightDriveMotors.move(PID(rightDriveTarget, rightInertialSensor, 1, 0, 0, &rightDriveI, 10, &rightDriveLastError));
-			leftDriveMotors.move(PID(leftDriveTarget, leftInertialSensor, 1, 0, 0, &leftDriveI, 10, &leftDriveLastError));
+		// Drive Movement
+		if (enablePID) {
+			rightDriveMotors.move(PID(rightDriveTarget, rightDriveActual, 1, 0, 0, &rightDriveI, 10, &rightDriveLastError));
+			leftDriveMotors.move(PID(leftDriveTarget, leftDriveActual, 1, 0, 0, &leftDriveI, 10, &leftDriveLastError));
 		}
 		else {
 			rightDriveMotors.move(rightDriveTarget);
@@ -292,7 +297,7 @@ void driveControlSystem() {
 			lcd::set_text(5, "PID disabled.");
 		}
 
-		//clamp piston movememnt
+		// Clamp piston movememnt
 		if (pistonTarget){
 			clampPistons.extend();
 		}
@@ -300,48 +305,45 @@ void driveControlSystem() {
 			clampPistons.retract();
 		}
 
-		//intake-score movement
+		// Intake-score movement
 		if (intakeScoreTarget == 1){
-			intake.move(90);
-			score.move(80);
+			intakeMotor.move(90);
+			scoreMotor.move(80);
 		}else if (intakeScoreTarget == 2)
 		{
-			intake.move(-90);
-			score.move(-80);
+			intakeMotor.move(-90);
+			scoreMotor.move(-80);
 			
 		} else if (intakeScoreTarget == 0)
 		{
-			intake.move(0);
-			score.move(0);
+			intakeMotor.move(0);
+			scoreMotor.move(0);
 		}
 
-		//fourbar movement					//o7 need to add motors for the fourbar
-		if (fourbarTarget == 2)
-		{
-			fourbarMotorR.move(127);
-			fourbarMotorL.move(127);
-		}else if (fourbarTarget == 1)
-		{
-			fourbarMotorR.move(-127);
-			fourbarMotorL.move(-127);
-		} else if (fourbarTarget == 0)
-		{
-			fourbarMotorR.move(0);
-			fourbarMotorL.move(0);
-
+		// Fourbar movement
+		if (fourbarTarget == 2) {
+			rightFourbarMotor.move(127);
+			leftFourbarMotor.move(127);
 		}
-
+		else if (fourbarTarget == 1) {
+			rightFourbarMotor.move(-127);
+			leftFourbarMotor.move(-127);
+		}
+		else if (fourbarTarget == 0) {
+			rightFourbarMotor.move(0);
+			leftFourbarMotor.move(0);
+		}
 
 		mutex.give(); // End Exclusivity
 
-		delay(waitInterval);   //wait
+		delay(waitInterval);
 	}
-	lcd::set_text(3, "Error in control system loop");
+	lcd::set_text(3, "Error in control system loop.");
 }
 
 
 /* 
- * TODO
+ * PID control system method.
  */
 int PID(int target, int sensor, int kP, int kI, int kD, int* I, int limitI, int* lastError) {
 	int PID = 0;
