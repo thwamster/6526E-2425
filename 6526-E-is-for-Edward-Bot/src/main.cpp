@@ -1,4 +1,5 @@
 #include "main.h"
+#include "liblvgl/lvgl.h"
 
 using namespace std;
 using namespace pros;
@@ -109,7 +110,7 @@ void updateGameInformation() {
 	delay(250);
 	setCurrentPosition(drawScreenButtons("Select Position:", {"Positive", "Negative"}, {Color::yellow, Color::purple}));
 	delay(250);
-	setCurrentAutonomous(drawScreenButtons("Select Autonomous:", {"Program #1", "Program #2", "Program #3", "Program #4"}, {Color::red, Color::yellow, Color::green, Color::blue}));
+	setCurrentAutonomous(drawScreenButtons("Select Autonomous:", {"#1", "#2", "#3", "#4"}, {Color::red, Color::yellow, Color::green, Color::blue}));
 	delay(250);
 	drawScreenBackground();
 }
@@ -462,11 +463,13 @@ int drawScreenButtons(std::string prompt, std::vector<std::string> icons, std::v
 	int width = (screenIndentRight - screenIndentLeft) / n;
 
 	drawScreenBackground();
-	drawScreenText(prompt, 60, 60, Color::white, Color::dark_green);
+	drawScreenText(prompt, screenIndentLeft, screenIndentLeft, Color::white, Color::dark_green);
 	for (int i = 0; i < n; i++) {
 		drawScreenButton(icons[i], (screenIndentLeft + (width * i)), screenIndentTop, (screenIndentLeft + (width * (i + 1))), screenIndentBottom, Color::white, colors[i]);
 	}
 	drawScreenHeader();
+
+	delay(1000);
 
 	return waitUntilButtonPressed(n, width);
 }
@@ -560,3 +563,12 @@ int getLeftDriveActual() { return leftDriveActual; }
 int getRightDriveActual() { return rightDriveActual; }
 bool getEnablePID() { return enablePID; }
 std::string getDisplayTextAt(int i) { return displayText[i]; }
+
+/* LVGL */
+void foo() {
+	lv_obj_t* headerLabel;
+
+	lv_label_create(headerLabel);
+
+	delay(10000);
+}
