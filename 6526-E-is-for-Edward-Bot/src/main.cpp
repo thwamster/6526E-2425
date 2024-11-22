@@ -1,8 +1,4 @@
 #include "main.h"
-#include "liblvgl/lvgl.h"
-
-using namespace std;
-using namespace pros;
 
 /* Global Objects */
 // Constant Intervals
@@ -10,14 +6,6 @@ const int waitInterval = 12;
 const int maxInterval = 100;
 const int doubleInputDelay = 150;
 const int autonDelay = 300;
-
-// Screen Informaton
-const int screenWidth = 480;
-const int screenHeight = 240;
-const int screenIndentTop = 100;
-const int screenIndentRight = reverseScreenWidth(60);
-const int screenIndentBottom = reverseScreenHeight(60);
-const int screenIndentLeft = 60;
 
 // Tasks
 pros::Mutex mutex;
@@ -36,13 +24,6 @@ pros::MotorGroup intakeMotor({7});
 pros::MotorGroup scoreMotor({8}); 
 adi::Pneumatics clampPistons(8, true);
 
-// Game Information
-int currentPeriod{};
-int currentSide{};
-int currentPosition{};
-int currentAutonomous{};
-string displayText[9]{};
-
 // Target Variables
 int leftDriveTarget{};
 int rightDriveTarget{};
@@ -56,16 +37,90 @@ int rightDriveActual{};
 // Toggles
 bool enablePID{false};
 
+/* Graphical Objects */
+
+// Game Information
+int currentPeriod{};
+int currentSide{};
+int currentPosition{};
+int currentAutonomous{};
+
+int currentScreen{};
+bool initialized{false};
+
+// Buffers
+static lv_color_t bufferAll[LV_CANVAS_BUF_SIZE_TRUE_COLOR(480, 240)];
+
+// Colors
+lv_color_t colorWhite;
+lv_color_t colorBlack;
+lv_color_t colorDamienGreen;
+lv_color_t colorSpartanGold;
+lv_color_t colorMilenniumGold;
+lv_color_t colorCoolGray;
+
+// Screens
+lv_obj_t *screenMainMenu;
+lv_obj_t *screenAutonomous;
+lv_obj_t *screenElectronics;
+lv_obj_t *screenInformation;
+
+// Fonts
+lv_font_t fontTrajan40;
+lv_font_t fontFauna14;
+lv_font_t fontCalibri13;
+lv_font_t fontCalibri11;
+
+// Images
+lv_obj_t *imgHeader;
+lv_obj_t *imgMainLayout;
+
+// Image DSCs
+lv_img_dsc_t imgDscSpartanHelmetGreen;
+lv_img_dsc_t imgDscSpartanHelmetGold;
+lv_img_dsc_t imgDscLayoutVex;
+lv_img_dsc_t imgDscLayoutSkills;
+
+// Styles
+static lv_style_t styleTextHeader1;
+static lv_style_t styleTextHeader2;
+static lv_style_t styleTextHeader3;
+static lv_style_t styleButton;
+static lv_style_t styleButtonSelected;
+static lv_style_t styleBox;
+
+// Rectangle DSCs
+lv_draw_rect_dsc_t dscHeader;
+lv_draw_rect_dsc_t dscBody;
+
+// Canvas
+lv_obj_t *canvasHeader;
+
+// Dropdown
+lv_obj_t * dropdownHeader;
+
+// Texts
+lv_obj_t *textHeader1;
+lv_obj_t *textHeader2;
+lv_obj_t *textBattery1;
+lv_obj_t *textBattery2;
+lv_obj_t *textMainInfo;
+
+// Buttons
+lv_obj_t *buttonMainInfo;
+
 /* Competition */
 void initialize() {
+
+	// Updsate graphics
+	initializeAllGraphics();
+	initialized = true;
 
 	// Update tasks
 	autonomousPeriod.suspend();
 	driverControlledPeriod.suspend();
 	robotControlSystem.suspend();
 	screenControlSystem.resume();
-
-	updateGameInformation(); // Update game information
 
 	setCurrentPeriod(0); // Update period
 }
@@ -100,19 +155,6 @@ void opcontrol() {
 		
 		delay(waitInterval); // Wait
 	}
-}
-
-// Competition Helper Methods
-void updateGameInformation() {
-	drawScreenBackground();
-	delay(250);
-	setCurrentSide(drawScreenButtons("Select Side:", {"Red", "Blue"}, {Color::red, Color::blue}));
-	delay(250);
-	setCurrentPosition(drawScreenButtons("Select Position:", {"Positive", "Negative"}, {Color::yellow, Color::purple}));
-	delay(250);
-	setCurrentAutonomous(drawScreenButtons("Select Autonomous:", {"#1", "#2", "#3", "#4"}, {Color::red, Color::yellow, Color::green, Color::blue}));
-	delay(250);
-	drawScreenBackground();
 }
 
 // Unused Competition Methods
@@ -374,125 +416,68 @@ int PID(int target, int sensor, double kP, double kI, double kD, int* I, int lim
 void updateDisplay() {
 	int bgDelay{};
 
-	fill_n(displayText, (sizeof(displayText)/sizeof(displayText[0])), "");
-	setDisplayTextAt(0, "6526 E-is-for-Edward Bot");
-	drawScreenBackground();
-
 	// Control loop
 	while (true) {
 
 		// If during driver controlled or autonomous periods
 		if (getCurrentPeriod() == 2 || getCurrentPeriod() == 3) {
+			updateController();
+		}
 
-			// Update text to display
-			updateDisplayText();
-
-			// Display background
-			if (bgDelay >= 100) {
-				drawScreenBackground();
-				bgDelay = 0;
-			}
-			bgDelay++;
-			
-			// Display foregrounds
-			drawScreenHeader();
-			drawScreenData();
-			drawController();
+		if (initialized) { 
+			checkUpdates();
+			updateText();
+			updateCanvas();
 		}
 
 		delay(waitInterval); // Wait
 	}
 }
 
-void updateDisplayText() {
-
-	mutex.take(maxInterval); // Begin exclusivity
-	
-	// Updates lines from variables
-	setDisplayTextAt(1, "Period: " + parseCurrentPeriod());
-	setDisplayTextAt(2, "Side: " + parseCurrentSide() + ". Start Position: " + parseCurrentPeriod());
-	setDisplayTextAt(3, "Selected Autonomous: " + parseCurrentAutonomous());
-	setDisplayTextAt(4, "Right Target: " + to_string(rightDriveTarget) + ". Right Actual: " + to_string(rightDriveActual));
-	setDisplayTextAt(5, "Left Target: " + to_string(leftDriveTarget) + ". Left Actual: " + to_string(leftDriveActual));
-	setDisplayTextAt(6, "Intake Target: " + to_string(intakeScoreTarget) + ". Piston Target: " + to_string(pistonTarget));
-	setDisplayTextAt(7, "PID enabled: " + to_string(enablePID));
-		
-	mutex.give(); // End exclusivity
-}
-
-void updateScreenColors(pros::Color pen, pros::Color eraser) {
-	pros::screen::set_pen(pen);
-	pros::screen::set_eraser(eraser);
-}
-
-// Screen Drawing Methods
-void drawScreenBackground() {
-	updateScreenColors(Color::white, Color::dark_green);
-	pros::screen::erase_rect(0, 0, 480, 240);
-}
-
-void drawScreenButton(std::string text, int x1, int y1, int x2, int y2, pros::Color pen, pros::Color eraser) {
-	updateScreenColors(pen, eraser);
-	pros::screen::erase_rect(x1, y1, x2, y2);
-	drawScreenText(text, (x1 + 20), (y1 + 20), pen, eraser);
-}
-
-void drawScreenText(std::string text, int x, int y, pros::Color pen, pros::Color eraser) {
-	updateScreenColors(pen, eraser);
-	pros::screen::print(E_TEXT_LARGE, x, y, text.c_str());
-}
-
-void drawScreenHeader() {
-	updateScreenColors(Color::gold, Color::dark_green);
-	pros::screen::print(pros::E_TEXT_LARGE_CENTER, 1, 10, getDisplayTextAt(0).c_str());
-}
-
-void drawScreenData() {
-	updateScreenColors(Color::white, Color::dark_green);
-	for (int i = 1; i < (sizeof(displayText)/sizeof(displayText[0])); i++) {
-		pros::screen::print(pros::E_TEXT_MEDIUM, 5, ((i + 1) * 22), getDisplayTextAt(i).c_str());
+void checkUpdates() {
+	int n = lv_dropdown_get_selected(dropdownHeader);
+	if (n == currentScreen) {
+		return;
 	}
-}
-
-void drawController() {
-	masterController.print(0, 0, ("6526-E: " + parseCurrentSide()).c_str());
-}
-
-int drawScreenButtons(std::string prompt, std::vector<std::string> icons, std::vector<pros::Color> colors) {
-	int n = std::min(icons.size(), colors.size());
-	int width = (screenIndentRight - screenIndentLeft) / n;
-
-	drawScreenBackground();
-	drawScreenText(prompt, screenIndentLeft, screenIndentLeft, Color::white, Color::dark_green);
-	for (int i = 0; i < n; i++) {
-		drawScreenButton(icons[i], (screenIndentLeft + (width * i)), screenIndentTop, (screenIndentLeft + (width * (i + 1))), screenIndentBottom, Color::white, colors[i]);
-	}
-	drawScreenHeader();
-
-	delay(1000);
-
-	return waitUntilButtonPressed(n, width);
-}
-
-int waitUntilButtonPressed(int n, int width) {
-	while (pros::screen::touch_status().touch_status != pros::E_TOUCH_HELD) {
-		delay(waitInterval);
-	}
-
-	int x = pros::screen::touch_status().x;
-	int y = pros::screen::touch_status().y;
-
-	if (!isBetween(y, screenIndentTop, screenIndentBottom)) {
-		return waitUntilButtonPressed(n, width);
-	}
-
-	for (int i = 0; i < n; i++) {
-		if (isBetween(x, (screenIndentLeft + (width * i)), (screenIndentLeft + (width * (i + 1))))) {
-			return (i + 1);
+	else {
+		currentScreen = n;
+		switch (n) {
+			case 0:
+				updateScreens(screenMainMenu);
+				break;
+			case 1:
+				updateScreens(screenAutonomous);
+				break;
+			case 2:
+				updateScreens(screenElectronics);
+				break;
+			case 3:
+				updateScreens(screenInformation);
+				break;
 		}
 	}
+}
 
-	return waitUntilButtonPressed(n, width);
+void updateScreens(lv_obj_t * screen) {
+	lv_scr_load(screen);
+	lv_obj_set_parent(canvasHeader, screen);
+	lv_obj_set_parent(dropdownHeader, screen);
+	lv_obj_set_parent(textHeader1, screen);
+	lv_obj_set_parent(textHeader2, screen);
+	lv_obj_set_parent(imgHeader, screen);
+	lv_obj_set_parent(buttonMainInfo, screenMainMenu);
+	lv_obj_set_parent(imgMainLayout, screenMainMenu);
+}
+
+void updateText() {
+	lv_label_set_text(textHeader1, "6526-E");
+	lv_label_set_text(textHeader2, "E-is-for-Edward\nDamien Robotics");
+	string stringInfo = "Period: " + parseCurrentPeriod() + "\nStart Position: " + parseCurrentPosition() + "\nSelected Autonomous: " + parseCurrentAutonomous();
+    lv_label_set_text(textMainInfo, stringInfo.c_str());
+}
+
+void updateController() {
+	masterController.print(0, 0, ("6526-E: " + parseCurrentSide()).c_str());
 }
 
 // Screen Parsing Methods
@@ -531,10 +516,163 @@ std::string parseCurrentAutonomous() {
 	}
 }
 
-// Screen Helpr Methods
-int reverseScreenWidth(int n) { return screenWidth - n; }
-int reverseScreenHeight(int n) { return screenHeight - n; }
-bool isBetween(int n, int min, int max) { return n >= min && n <= max; }
+/* Graphical Methods */
+void initializeAllGraphics() {
+	initializeScreens();
+	initializeColors();
+	initializeFonts();
+	initializeImageDSCs();
+	initializeStyles();
+	initializeDSC();
+	initializeCanvas();
+	initializeDropdown();
+	initializeText();
+	initializeButtons();
+	initializeImages();
+	
+	lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
+}
+
+void initializeScreens() {
+	screenMainMenu = lv_obj_create(NULL);
+	screenAutonomous = lv_obj_create(NULL);
+	screenElectronics = lv_obj_create(NULL);
+	screenInformation = lv_obj_create(NULL);
+
+	lv_disp_load_scr(screenMainMenu);
+}
+
+void initializeColors() {
+	colorWhite = lv_color_hex(0xFFFFFF);
+	colorBlack = lv_color_hex(0x000000);
+    colorDamienGreen = lv_color_hex(0x244546);
+    colorSpartanGold = lv_color_hex(0xFFB81C);
+    colorMilenniumGold = lv_color_hex(0xB3A369);
+    colorCoolGray = lv_color_hex(0xA7A8A9);
+}
+
+void initializeFonts() {
+	LV_FONT_DECLARE(trajan_40);
+	LV_FONT_DECLARE(fauna_14);
+	LV_FONT_DECLARE(calibri_13);
+	LV_FONT_DECLARE(calibri_11);
+
+	fontTrajan40 = trajan_40;
+	fontFauna14 = fauna_14;
+	fontCalibri13 = calibri_13;
+	fontCalibri11 = calibri_11;
+}
+
+void initializeImageDSCs() {
+	LV_IMG_DECLARE(icon_spartan_helmet);
+	LV_IMG_DECLARE(icon_spartan_helmet_gold);
+	LV_IMG_DECLARE(layout_vex);
+	LV_IMG_DECLARE(layout_skills);
+
+	imgDscSpartanHelmetGreen = icon_spartan_helmet;
+	imgDscSpartanHelmetGold = icon_spartan_helmet_gold;
+	imgDscLayoutVex = layout_vex;
+	imgDscLayoutSkills = layout_skills;
+}
+
+void initializeStyles() {
+	lv_style_init(&styleTextHeader1);
+	lv_style_set_text_font(&styleTextHeader1, &fontTrajan40);
+    lv_style_set_text_color(&styleTextHeader1, colorSpartanGold);
+
+    lv_style_init(&styleTextHeader2);
+	lv_style_set_text_font(&styleTextHeader2, &fontFauna14);
+    lv_style_set_text_color(&styleTextHeader2, colorSpartanGold);
+
+	lv_style_init(&styleTextHeader3);
+	lv_style_set_text_font(&styleTextHeader3, &fontCalibri13);
+    lv_style_set_text_color(&styleTextHeader3, colorBlack);
+
+	lv_style_init(&styleButton); 
+	lv_style_set_text_font(&styleButton, &fontFauna14);
+	lv_style_set_text_color(&styleButton, colorSpartanGold);
+	lv_style_set_bg_color(&styleButton, colorDamienGreen);
+	lv_style_set_radius(&styleButton, 0);
+	lv_style_set_border_width(&styleButton, 3);
+	lv_style_set_border_color(&styleButton, colorBlack);
+
+	lv_style_init(&styleBox);
+	lv_style_set_text_font(&styleBox, &fontCalibri13);
+	lv_style_set_text_color(&styleBox, colorBlack);
+	lv_style_set_pad_all(&styleBox, 4);
+	lv_style_set_bg_color(&styleBox, colorCoolGray);
+	lv_style_set_radius(&styleBox, 0);
+	lv_style_set_border_width(&styleBox, 2);
+	lv_style_set_border_color(&styleBox, colorBlack);
+}
+
+void initializeDSC() {
+	lv_draw_rect_dsc_init(&dscHeader);
+    dscHeader.bg_color = colorDamienGreen;
+    dscHeader.border_color = colorBlack;
+    dscHeader.border_width = 3;
+
+	lv_draw_rect_dsc_init(&dscBody);
+    dscBody.bg_color = colorCoolGray;
+    dscBody.border_color = colorBlack;
+    dscBody.border_width = 3;
+}
+
+void initializeCanvas() {
+	canvasHeader = lv_canvas_create(lv_scr_act());
+	lv_obj_align(canvasHeader, LV_ALIGN_TOP_LEFT, 0, 0);
+    lv_canvas_set_buffer(canvasHeader, bufferAll, 480, 240, LV_IMG_CF_TRUE_COLOR);
+}
+
+void updateCanvas() {
+	lv_canvas_fill_bg(canvasHeader, colorCoolGray, LV_OPA_COVER);
+	lv_canvas_draw_rect(canvasHeader, 0, 0, 480, 50, &dscHeader);
+	lv_canvas_draw_rect(canvasHeader, 0, 50, 480, 230, &dscBody);
+}
+
+void initializeDropdown() {
+	dropdownHeader = lv_dropdown_create(lv_scr_act());
+	lv_dropdown_set_options(dropdownHeader, "Main Menu\nAutonomous\nElectronics\nInformation");
+	lv_dropdown_set_symbol(dropdownHeader, NULL);
+	lv_obj_add_style(dropdownHeader, &styleButton, 0);
+	lv_obj_add_style(lv_dropdown_get_list(dropdownHeader), &styleButton, 0);
+	lv_obj_set_size(dropdownHeader, 130, 40);
+	lv_obj_align(dropdownHeader, LV_ALIGN_TOP_LEFT, 345, 5);
+}
+
+void initializeText() {
+	textHeader1 = lv_label_create(lv_scr_act());
+    lv_obj_add_style(textHeader1, &styleTextHeader1, 0);
+    lv_obj_align(textHeader1, LV_ALIGN_TOP_LEFT, 43, 0);
+
+    textHeader2 = lv_label_create(lv_scr_act());
+    lv_obj_add_style(textHeader2, &styleTextHeader2, 0);
+    lv_obj_align(textHeader2, LV_ALIGN_TOP_LEFT, 185, 5);
+}
+
+void initializeButtons() {
+	buttonMainInfo = lv_btn_create(screenMainMenu);
+	lv_obj_align(buttonMainInfo, LV_ALIGN_TOP_LEFT, 10, 60);
+	lv_obj_add_style(buttonMainInfo, &styleBox, 0);
+	lv_obj_clear_flag(buttonMainInfo, LV_OBJ_FLAG_CLICKABLE);
+
+	textMainInfo = lv_label_create(buttonMainInfo);
+    lv_obj_add_style(textMainInfo, &styleTextHeader3, 0);
+}
+
+void initializeImages() {
+	imgHeader = lv_img_create(lv_scr_act());
+	lv_img_set_src(imgHeader, &imgDscSpartanHelmetGold);
+	lv_img_set_pivot(imgHeader, 0, 0);
+	lv_img_set_zoom(imgHeader, ((int) (256 * 0.22)));
+	lv_obj_align(imgHeader, LV_ALIGN_TOP_LEFT, 5, 5);
+
+	imgMainLayout = lv_img_create(lv_scr_act());
+	lv_img_set_src(imgMainLayout, &imgDscLayoutVex);
+	lv_img_set_pivot(imgMainLayout, 0, 0);
+	lv_img_set_zoom(imgMainLayout, ((int) (256 * 0.64)));
+	lv_obj_align(imgMainLayout, LV_ALIGN_TOP_LEFT, 295, 55);
+}
 
 /* Set Methods */
 void setCurrentPeriod(int n) { currentPeriod = n; }
@@ -548,7 +686,6 @@ void setPistonTarget(int n) { pistonTarget = n; }
 void setEnablePID(bool b) { enablePID = b; }
 void setLeftDriveActual(int n) { leftDriveActual = n; }
 void setRightDriveActual(int n) { rightDriveActual = n; }
-void setDisplayTextAt(int i, std::string s) { displayText[i] = s; }
 
 /* Get Methods */
 int getCurrentPeriod() { return currentPeriod; }
@@ -562,13 +699,3 @@ int getPistonTarget() { return pistonTarget; }
 int getLeftDriveActual() { return leftDriveActual; }
 int getRightDriveActual() { return rightDriveActual; }
 bool getEnablePID() { return enablePID; }
-std::string getDisplayTextAt(int i) { return displayText[i]; }
-
-/* LVGL */
-void foo() {
-	lv_obj_t* headerLabel;
-
-	lv_label_create(headerLabel);
-
-	delay(10000);
-}

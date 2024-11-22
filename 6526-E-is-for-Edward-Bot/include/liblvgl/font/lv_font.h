@@ -244,7 +244,6 @@ LV_FONT_DECLARE(lv_font_unscii_16)
 
 /*Declare the custom (user defined) fonts*/
 #ifdef LV_FONT_CUSTOM_DECLARE
-LV_FONT_CUSTOM_DECLARE
 #endif
 #if USE_PROS_FONT_DEJAVU_MONO_10
 LV_FONT_DECLARE(pros_font_dejavu_mono_10);

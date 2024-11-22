@@ -5,6 +5,11 @@
 #define PROS_USE_LITERALS
 
 #include "api.h"
+#include "pros/apix.h"
+#include "liblvgl/lvgl.h"
+
+using namespace std;
+using namespace pros;
 
 #ifdef __cplusplus
 extern "C" {
@@ -14,9 +19,6 @@ extern "C" {
 void initialize();
 void autonomous();
 void opcontrol();
-
-// Competition Helper Methods
-void updateGameInformation();
 
 // Unused Competition Methods
 void disabled();
@@ -51,30 +53,32 @@ void updateRobot();
 int PID(int target, int sensor, double kP, double kI, double kD, int* I, int limitI, int* lastError);
 
 /* Screen Control System Task */
-void updateDisplay();
-void updateDisplayText();
-void updateScreenColors(pros::Color pen, pros::Color eraser);
-
-// Screen Drawing Methods
-void drawScreenBackground();
-void drawScreenButton(std::string text, int x1, int y1, int x2, int y2, pros::Color pen, pros::Color eraser);
-void drawScreenText(std::string text, int x, int y, pros::Color pen, pros::Color eraser);
-void drawScreenHeader();
-void drawScreenData();
-void drawController();
-int drawScreenButtons(std::string prompt, std::vector<std::string> icons, std::vector<pros::Color> colors);
-int waitUntilButtonPressed(int n, int width);
+void updateDisplay(void);
+void checkUpdates();
+void updateScreens(lv_obj_t * screen);
+void updateText(void);
+void updateCanvas(void);
+void updateController(void);
 
 // Screen Parsing Methods
-std::string parseCurrentPeriod();
-std::string parseCurrentSide();
-std::string parseCurrentPosition();
-std::string parseCurrentAutonomous();
+std::string parseCurrentPeriod(void);
+std::string parseCurrentSide(void);
+std::string parseCurrentPosition(void);
+std::string parseCurrentAutonomous(void);
 
-// Screen Helpr Methods
-int reverseScreenWidth(int n);
-int reverseScreenHeight(int n);
-bool isBetween(int n, int min, int max);
+/* Graphical Methods */
+void initializeAllGraphics(void);
+void initializeScreens(void);
+void initializeColors(void);
+void initializeFonts(void);
+void initializeImageDSCs(void);
+void initializeStyles(void);
+void initializeDSC(void);
+void initializeCanvas(void);
+void initializeDropdown(void);
+void initializeText(void);
+void initializeButtons(void);
+void initializeImages(void);
 
 /* Set Methods */
 void setCurrentPeriod(int n);
@@ -88,21 +92,19 @@ void setPistonTarget(int n);
 void setEnablePID(bool b);
 void setLeftDriveActual(int n);
 void setRightDriveActual(int n);
-void setDisplayTextAt(int i, std::string s);
 
 /* Get Methods */
-int getCurrentPeriod();
-int getCurrentSide();
-int getCurrentPosition();
-int getCurrentAutonomous();
-int getLeftDriveTarget();
-int getRightDriveTarget();
-int getIntakeScoreTarget();
-int getPistonTarget();
-int getLeftDriveActual();
-int getRightDriveActual();
-bool getEnablePID();
-std::string getDisplayTextAt(int i);
+int getCurrentPeriod(void);
+int getCurrentSide(void);
+int getCurrentPosition(void);
+int getCurrentAutonomous(void);
+int getLeftDriveTarget(void);
+int getRightDriveTarget(void);
+int getIntakeScoreTarget(void);
+int getPistonTarget(void);
+int getLeftDriveActual(void);
+int getRightDriveActual(void);
+bool getEnablePID(void);
 
 #ifdef __cplusplus
 } // extern "C"
