@@ -1,126 +1,17 @@
 #include "main.h"
 
-/* Global Objects */
-// Constant Intervals
-const int waitInterval = 12;
-const int maxInterval = 100;
-const int doubleInputDelay = 150;
-const int autonDelay = 300;
-
-// Tasks
-pros::Mutex mutex;
-pros::Task autonomousPeriod(getAutonomousInputs);
-pros::Task driverControlledPeriod(getDriverInputs);
-pros::Task robotControlSystem(updateRobot);
-pros::Task screenControlSystem(updateDisplay);
-
-// Controller
-pros::Controller masterController(E_CONTROLLER_MASTER);
-
-// Robot Movement
-pros::MotorGroup leftDriveMotors({-9, -10});
-pros::MotorGroup rightDriveMotors({1,2});
-pros::MotorGroup intakeMotor({7});
-pros::MotorGroup scoreMotor({8}); 
-adi::Pneumatics clampPistons(8, true);
-
-// Target Variables
-int leftDriveTarget{};
-int rightDriveTarget{};
-int intakeScoreTarget{};
-int pistonTarget{};
-
-// Actual Variables
-int leftDriveActual{};
-int rightDriveActual{};
-
-// Toggles
-bool enablePID{false};
-
-/* Graphical Objects */
-
-// Game Information
-int currentPeriod{};
-int currentSide{};
-int currentPosition{};
-int currentAutonomous{};
-
-int currentScreen{};
-bool initialized{false};
-
-// Buffers
-static lv_color_t bufferAll[LV_CANVAS_BUF_SIZE_TRUE_COLOR(480, 240)];
-
-// Colors
-lv_color_t colorWhite;
-lv_color_t colorBlack;
-lv_color_t colorDamienGreen;
-lv_color_t colorSpartanGold;
-lv_color_t colorMilenniumGold;
-lv_color_t colorCoolGray;
-
-// Screens
-lv_obj_t *screenMainMenu;
-lv_obj_t *screenAutonomous;
-lv_obj_t *screenElectronics;
-lv_obj_t *screenInformation;
-
-// Fonts
-lv_font_t fontTrajan40;
-lv_font_t fontFauna14;
-lv_font_t fontCalibri13;
-lv_font_t fontCalibri11;
-
-// Images
-lv_obj_t *imgHeader;
-lv_obj_t *imgMainLayout;
-
-// Image DSCs
-lv_img_dsc_t imgDscSpartanHelmetGreen;
-lv_img_dsc_t imgDscSpartanHelmetGold;
-lv_img_dsc_t imgDscLayoutVex;
-lv_img_dsc_t imgDscLayoutSkills;
-
-// Styles
-static lv_style_t styleTextHeader1;
-static lv_style_t styleTextHeader2;
-static lv_style_t styleTextHeader3;
-static lv_style_t styleButton;
-static lv_style_t styleButtonSelected;
-static lv_style_t styleBox;
-
-// Rectangle DSCs
-lv_draw_rect_dsc_t dscHeader;
-lv_draw_rect_dsc_t dscBody;
-
-// Canvas
-lv_obj_t *canvasHeader;
-
-// Dropdown
-lv_obj_t * dropdownHeader;
-
-// Texts
-lv_obj_t *textHeader1;
-lv_obj_t *textHeader2;
-lv_obj_t *textBattery1;
-lv_obj_t *textBattery2;
-lv_obj_t *textMainInfo;
-
-// Buttons
-lv_obj_t *buttonMainInfo;
-
-/* Competition */
+/* Competition Methods */
 void initialize() {
 
 	// Updsate graphics
 	initializeAllGraphics();
-	initialized = true;
+	currentState = true;
 
 	// Update tasks
 	autonomousPeriod.suspend();
 	driverControlledPeriod.suspend();
 	robotControlSystem.suspend();
-	screenControlSystem.resume();
+	displayControlSystem.resume();
 
 	setCurrentPeriod(0); // Update period
 }
@@ -228,7 +119,7 @@ void runProgram3() {}
 void runProgram4() {}
 
 // Autonomous Helper Methods
-void moveForTime(std::vector<int*> targets, std::vector<int> values, int t) {
+void moveForTime(vector<int*> targets, vector<int> values, int t) {
 
 	// Updates all values
 	for (int i = 0; i < targets.size() && i < values.size(); i++) {
@@ -412,67 +303,92 @@ int PID(int target, int sensor, double kP, double kI, double kD, int* I, int lim
 	return PID; // Returns
 }
 
-/* Screen Control System Task */
+/* Display Control System Task */
 void updateDisplay() {
-	int bgDelay{};
 
 	// Control loop
 	while (true) {
 
-		// If during driver controlled or autonomous periods
-		if (getCurrentPeriod() == 2 || getCurrentPeriod() == 3) {
-			updateController();
+		if (currentState) { 
+			updateScreen();
+			updateGameInformation();
+			updateImages();
+			updateCanvas();
+			updateText();
 		}
 
-		if (initialized) { 
-			checkUpdates();
-			updateText();
-			updateCanvas();
+		if (getCurrentPeriod() == 2 || getCurrentPeriod() == 3) {
+			updateController();
 		}
 
 		delay(waitInterval); // Wait
 	}
 }
 
-void checkUpdates() {
+void updateScreen() {
 	int n = lv_dropdown_get_selected(dropdownHeader);
 	if (n == currentScreen) {
 		return;
 	}
 	else {
 		currentScreen = n;
-		switch (n) {
-			case 0:
-				updateScreens(screenMainMenu);
-				break;
-			case 1:
-				updateScreens(screenAutonomous);
-				break;
-			case 2:
-				updateScreens(screenElectronics);
-				break;
-			case 3:
-				updateScreens(screenInformation);
-				break;
-		}
+		updateScreenTo(getScreenAt(n));
 	}
 }
 
-void updateScreens(lv_obj_t * screen) {
+void updateScreenTo(lv_obj_t *screen) {
 	lv_scr_load(screen);
-	lv_obj_set_parent(canvasHeader, screen);
-	lv_obj_set_parent(dropdownHeader, screen);
-	lv_obj_set_parent(textHeader1, screen);
-	lv_obj_set_parent(textHeader2, screen);
-	lv_obj_set_parent(imgHeader, screen);
-	lv_obj_set_parent(buttonMainInfo, screenMainMenu);
-	lv_obj_set_parent(imgMainLayout, screenMainMenu);
+
+	for (int i = 0; i < screenObjects.size(); i++) {
+
+		for (int j = 0; j < screenObjects[i].size(); j++) {
+			if (i == 0) {
+				lv_obj_set_parent(screenObjects[i][j], screen);
+			}
+			else {
+				lv_obj_set_parent(screenObjects[i][j], getScreenAt(i - 1));
+			}
+		}
+	}
+
+	lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
+}
+
+void updateGameInformation() {
+	setCurrentMode(lv_dropdown_get_selected(dropdownAutonomousMode) + 1);
+	setCurrentSide(lv_dropdown_get_selected(dropdownAutonomousSide) + 1);
+	setCurrentPosition(lv_dropdown_get_selected(dropdownAutonomousPosition) + 1);
+	setCurrentAutonomous(lv_dropdown_get_selected(dropdownAutonomousAutonomous) + 1);
+}
+
+void updateImages() {
+	switch (getCurrentMode()) {
+		case 1: 
+			updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64);
+			break;
+		case 2: 
+			updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutSkills, 0.64);
+			break;
+	}
+}
+
+void updateImageTo(lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom) {
+	lv_img_set_src(*image, src);
+	lv_img_set_pivot(*image, 0, 0);
+	lv_img_set_zoom(*image, ((int) (256 * zoom)));
+	lv_obj_align(*image, LV_ALIGN_TOP_LEFT, x, y);
+}
+
+void updateCanvas() {
+	lv_canvas_fill_bg(canvasHeader, colorCoolGray, LV_OPA_COVER);
+	lv_canvas_draw_rect(canvasHeader, 0, 0, 480, 50, &dscRectHeader);
+	lv_canvas_draw_rect(canvasHeader, 0, 50, 480, 230, &dscRectBody);
 }
 
 void updateText() {
 	lv_label_set_text(textHeader1, "6526-E");
 	lv_label_set_text(textHeader2, "E-is-for-Edward\nDamien Robotics");
-	string stringInfo = "Period: " + parseCurrentPeriod() + "\nStart Position: " + parseCurrentPosition() + "\nSelected Autonomous: " + parseCurrentAutonomous();
+	string stringInfo = "Mode: " + parseCurrentMode() + "\nPeriod: " + parseCurrentPeriod() + "\nSide: " + parseCurrentSide()  + "\nStart Position: " + parseCurrentPosition() + "\nSelected Autonomous: " + parseCurrentAutonomous();
     lv_label_set_text(textMainInfo, stringInfo.c_str());
 }
 
@@ -480,69 +396,23 @@ void updateController() {
 	masterController.print(0, 0, ("6526-E: " + parseCurrentSide()).c_str());
 }
 
-// Screen Parsing Methods
-std::string parseCurrentPeriod() {
-	switch (getCurrentPeriod()) {
-		case 1: return "Initializing";
-		case 2: return "Driver Controlled";
-		case 3: return "Autonomous Controlled";
-		default: return "Unknown";
-	}
-}
-
-std::string parseCurrentSide() {
-	switch (getCurrentSide()) {
-		case 1: return "Red";
-		case 2: return "Blue";
-		default: return "Unknown";
-	}
-}
-
-std::string parseCurrentPosition() {
-	switch (getCurrentPosition()) {
-		case 1: return "Positive";
-		case 2: return "Negative";
-		default: return "Unknown";
-	}
-}
-
-std::string parseCurrentAutonomous() {
-	switch (getCurrentAutonomous()) {
-		case 1: return "Program #1: Preload Score";
-		case 2: return "Program #2";
-		case 3: return "Program #3";
-		case 4: return "Program #4";
-		default: return "Unknown";
-	}
-}
-
-/* Graphical Methods */
+// Display Initializaiton Methods
 void initializeAllGraphics() {
-	initializeScreens();
 	initializeColors();
 	initializeFonts();
-	initializeImageDSCs();
+	initializeDSCs();
 	initializeStyles();
-	initializeDSC();
-	initializeCanvas();
-	initializeDropdown();
-	initializeText();
-	initializeButtons();
-	initializeImages();
-	
-	lv_obj_clear_flag(lv_scr_act(), LV_OBJ_FLAG_SCROLLABLE);
-}
-
-void initializeScreens() {
-	screenMainMenu = lv_obj_create(NULL);
-	screenAutonomous = lv_obj_create(NULL);
-	screenElectronics = lv_obj_create(NULL);
-	screenInformation = lv_obj_create(NULL);
-
-	lv_disp_load_scr(screenMainMenu);
+	initializeAllScreens();
 }
 
 void initializeColors() {
+	createColor(&colorWhite, 0xFFFFFF);
+	createColor(&colorBlack, 0x000000);
+	createColor(&colorDamienGreen, 0x244546);
+	createColor(&colorSpartanGold, 0xFFB81C);
+	createColor(&colorMilenniumGold, 0xB3A369);
+	createColor(&colorWhite, 0xA7A8A9);
+
 	colorWhite = lv_color_hex(0xFFFFFF);
 	colorBlack = lv_color_hex(0x000000);
     colorDamienGreen = lv_color_hex(0x244546);
@@ -556,129 +426,241 @@ void initializeFonts() {
 	LV_FONT_DECLARE(fauna_14);
 	LV_FONT_DECLARE(calibri_13);
 	LV_FONT_DECLARE(calibri_11);
-
-	fontTrajan40 = trajan_40;
-	fontFauna14 = fauna_14;
-	fontCalibri13 = calibri_13;
-	fontCalibri11 = calibri_11;
+	
+	createFont(&fontTrajan40, trajan_40);
+	createFont(&fontFauna14, fauna_14);
+	createFont(&fontCalibri13, calibri_13);
+	createFont(&fontCalibri11, calibri_11);
 }
 
-void initializeImageDSCs() {
+void initializeDSCs() {
 	LV_IMG_DECLARE(icon_spartan_helmet);
 	LV_IMG_DECLARE(icon_spartan_helmet_gold);
 	LV_IMG_DECLARE(layout_vex);
 	LV_IMG_DECLARE(layout_skills);
+	
+	createDscImg(&dscImgSpartanHelmetGreen, icon_spartan_helmet);
+	createDscImg(&dscImgSpartanHelmetGold, icon_spartan_helmet_gold);
+	createDscImg(&dscImgLayoutVex, layout_vex);
+	createDscImg(&dscImgLayoutSkills, layout_skills);
 
-	imgDscSpartanHelmetGreen = icon_spartan_helmet;
-	imgDscSpartanHelmetGold = icon_spartan_helmet_gold;
-	imgDscLayoutVex = layout_vex;
-	imgDscLayoutSkills = layout_skills;
+	createDscRect(&dscRectHeader, colorDamienGreen, 3, colorBlack);
+	createDscRect(&dscRectBody, colorCoolGray, 3, colorBlack);
 }
 
 void initializeStyles() {
-	lv_style_init(&styleTextHeader1);
-	lv_style_set_text_font(&styleTextHeader1, &fontTrajan40);
-    lv_style_set_text_color(&styleTextHeader1, colorSpartanGold);
-
-    lv_style_init(&styleTextHeader2);
-	lv_style_set_text_font(&styleTextHeader2, &fontFauna14);
-    lv_style_set_text_color(&styleTextHeader2, colorSpartanGold);
-
-	lv_style_init(&styleTextHeader3);
-	lv_style_set_text_font(&styleTextHeader3, &fontCalibri13);
-    lv_style_set_text_color(&styleTextHeader3, colorBlack);
-
-	lv_style_init(&styleButton); 
-	lv_style_set_text_font(&styleButton, &fontFauna14);
-	lv_style_set_text_color(&styleButton, colorSpartanGold);
-	lv_style_set_bg_color(&styleButton, colorDamienGreen);
-	lv_style_set_radius(&styleButton, 0);
-	lv_style_set_border_width(&styleButton, 3);
-	lv_style_set_border_color(&styleButton, colorBlack);
-
-	lv_style_init(&styleBox);
-	lv_style_set_text_font(&styleBox, &fontCalibri13);
-	lv_style_set_text_color(&styleBox, colorBlack);
-	lv_style_set_pad_all(&styleBox, 4);
-	lv_style_set_bg_color(&styleBox, colorCoolGray);
-	lv_style_set_radius(&styleBox, 0);
-	lv_style_set_border_width(&styleBox, 2);
-	lv_style_set_border_color(&styleBox, colorBlack);
+	createTextStyle(&styleTextHeader1, &fontTrajan40, colorSpartanGold);
+	createTextStyle(&styleTextHeader2, &fontFauna14, colorSpartanGold);
+	createTextStyle(&styleTextHeader3, &fontCalibri13, colorBlack);
+	createButtonStyle(&styleButton, &fontFauna14, colorSpartanGold, colorDamienGreen, colorBlack);
+	createButtonStyle(&styleButtonSelected, &fontFauna14, colorWhite, colorSpartanGold, colorBlack);
+	createBoxStyle(&styleBox, &fontCalibri13, colorBlack, colorCoolGray, colorBlack);
 }
 
-void initializeDSC() {
-	lv_draw_rect_dsc_init(&dscHeader);
-    dscHeader.bg_color = colorDamienGreen;
-    dscHeader.border_color = colorBlack;
-    dscHeader.border_width = 3;
+void initializeAllScreens() {
+	createScreen(&screenMainMenu);
+	createScreen(&screenAutonomous);
+	createScreen(&screenElectronics);
+	createScreen(&screenInformation);
 
-	lv_draw_rect_dsc_init(&dscBody);
-    dscBody.bg_color = colorCoolGray;
-    dscBody.border_color = colorBlack;
-    dscBody.border_width = 3;
+	lv_disp_load_scr(screenMainMenu);
+	
+	initializeHeader();
+	initializeScreenMain();
+	initializeScreenAutonomous();
+	initializeScreenElectronics();
+	initializeScreenInformation();
+
+	updateScreenTo(screenMainMenu);
 }
 
-void initializeCanvas() {
-	canvasHeader = lv_canvas_create(lv_scr_act());
-	lv_obj_align(canvasHeader, LV_ALIGN_TOP_LEFT, 0, 0);
-    lv_canvas_set_buffer(canvasHeader, bufferAll, 480, 240, LV_IMG_CF_TRUE_COLOR);
+void initializeHeader() {
+	createCanvas(-1, &canvasHeader, 0, 0, displayWidth, displayHeight);
+	updateCanvas();
+	createImage(-1, &imgHeader, 5, 5, &dscImgSpartanHelmetGold, 0.22);
+	createLabel(-1, &textHeader1, 43, 0, &styleTextHeader1);
+	createLabel(-1, &textHeader2, 185, 5, &styleTextHeader2);
+	createDropdown(-1, &dropdownHeader, "Main Menu\nAutonomous\nElectronics\nInformation", 345, 5, 130, 40);
+
+	screenObjects.push_back({canvasHeader, imgHeader, textHeader1, textHeader2, dropdownHeader});
 }
 
-void updateCanvas() {
-	lv_canvas_fill_bg(canvasHeader, colorCoolGray, LV_OPA_COVER);
-	lv_canvas_draw_rect(canvasHeader, 0, 0, 480, 50, &dscHeader);
-	lv_canvas_draw_rect(canvasHeader, 0, 50, 480, 230, &dscBody);
+void initializeScreenMain() {
+	createBox(0, &buttonMainInfo, &textMainInfo, 10, 60);
+	createImage(0, &imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64);
+
+	screenObjects.push_back({buttonMainInfo, imgMainLayout});
 }
 
-void initializeDropdown() {
-	dropdownHeader = lv_dropdown_create(lv_scr_act());
-	lv_dropdown_set_options(dropdownHeader, "Main Menu\nAutonomous\nElectronics\nInformation");
-	lv_dropdown_set_symbol(dropdownHeader, NULL);
-	lv_obj_add_style(dropdownHeader, &styleButton, 0);
-	lv_obj_add_style(lv_dropdown_get_list(dropdownHeader), &styleButton, 0);
-	lv_obj_set_size(dropdownHeader, 130, 40);
-	lv_obj_align(dropdownHeader, LV_ALIGN_TOP_LEFT, 345, 5);
+void initializeScreenAutonomous() {
+	createDropdown(1, &dropdownAutonomousMode, "Competiton\nSkills", 5, 55, 100, 40);
+	createDropdown(1, &dropdownAutonomousSide, "Red\nBlue", 105, 55, 100, 40);
+	createDropdown(1, &dropdownAutonomousPosition, "Positive\nNegative", 205, 55, 100, 40);
+	createDropdown(1, &dropdownAutonomousAutonomous, "Program #1\nProgram #2\nProgram #3\nProgram #4", 305, 55, 100, 40);
+
+	screenObjects.push_back({dropdownAutonomousMode, dropdownAutonomousSide, dropdownAutonomousPosition, dropdownAutonomousAutonomous});
 }
 
-void initializeText() {
-	textHeader1 = lv_label_create(lv_scr_act());
-    lv_obj_add_style(textHeader1, &styleTextHeader1, 0);
-    lv_obj_align(textHeader1, LV_ALIGN_TOP_LEFT, 43, 0);
-
-    textHeader2 = lv_label_create(lv_scr_act());
-    lv_obj_add_style(textHeader2, &styleTextHeader2, 0);
-    lv_obj_align(textHeader2, LV_ALIGN_TOP_LEFT, 185, 5);
+void initializeScreenElectronics() {
+	// screenObjects.push_back({});
 }
 
-void initializeButtons() {
-	buttonMainInfo = lv_btn_create(screenMainMenu);
-	lv_obj_align(buttonMainInfo, LV_ALIGN_TOP_LEFT, 10, 60);
-	lv_obj_add_style(buttonMainInfo, &styleBox, 0);
-	lv_obj_clear_flag(buttonMainInfo, LV_OBJ_FLAG_CLICKABLE);
-
-	textMainInfo = lv_label_create(buttonMainInfo);
-    lv_obj_add_style(textMainInfo, &styleTextHeader3, 0);
+void initializeScreenInformation() {
+	// screenObjects.push_back({});
 }
 
-void initializeImages() {
-	imgHeader = lv_img_create(lv_scr_act());
-	lv_img_set_src(imgHeader, &imgDscSpartanHelmetGold);
-	lv_img_set_pivot(imgHeader, 0, 0);
-	lv_img_set_zoom(imgHeader, ((int) (256 * 0.22)));
-	lv_obj_align(imgHeader, LV_ALIGN_TOP_LEFT, 5, 5);
+// Display Creation Methods
+void createColor(lv_color_t *color, int hex) { *color = lv_color_hex(hex); }
+void createFont(lv_font_t *font, lv_font_t source) { *font = source; }
+void createDscImg(lv_img_dsc_t *dsc, lv_img_dsc_t source) { *dsc = source; }
 
-	imgMainLayout = lv_img_create(lv_scr_act());
-	lv_img_set_src(imgMainLayout, &imgDscLayoutVex);
-	lv_img_set_pivot(imgMainLayout, 0, 0);
-	lv_img_set_zoom(imgMainLayout, ((int) (256 * 0.64)));
-	lv_obj_align(imgMainLayout, LV_ALIGN_TOP_LEFT, 295, 55);
+void createDscRect(lv_draw_rect_dsc_t *dsc, lv_color_t bgColor, int borderWidth, lv_color_t borderColor) {
+	lv_draw_rect_dsc_init(dsc);
+    (*dsc).bg_color = bgColor;
+	(*dsc).border_width = borderWidth;
+    (*dsc).border_color = borderColor;
+}
+
+void createScreen(lv_obj_t **screen) { *screen = lv_obj_create(NULL); }
+
+void createTextStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor) {
+	lv_style_init(style);
+	lv_style_set_text_font(style, textFont);
+	lv_style_set_text_color(style, textColor);
+}
+
+void createButtonStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor) {
+	lv_style_init(style); 
+	lv_style_set_text_font(style, textFont);
+	lv_style_set_text_color(style, textColor);
+	lv_style_set_bg_color(style, bgColor);
+	lv_style_set_radius(style, 0);
+	lv_style_set_border_width(style, 3);
+	lv_style_set_border_color(style, borderColor);
+}
+
+void createBoxStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor) {
+	lv_style_init(style);
+	lv_style_set_text_font(style, textFont);
+	lv_style_set_text_color(style, textColor);
+	lv_style_set_pad_all(style, 4);
+	lv_style_set_bg_color(style, bgColor);
+	lv_style_set_radius(style, 0);
+	lv_style_set_border_width(style, 2);
+	lv_style_set_border_color(style, borderColor);
+}
+
+void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int w, int h) {
+	*canvas = lv_canvas_create(getScreenAt(screen));
+	lv_obj_align(*canvas, LV_ALIGN_TOP_LEFT, x, y);
+    lv_canvas_set_buffer(*canvas, bufferAll, w, h, LV_IMG_CF_TRUE_COLOR);
+}
+
+void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom) {
+	*image = lv_img_create(getScreenAt(screen));
+	updateImageTo(image, x, y, src, zoom);
+}
+
+void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style) {
+	*label = lv_label_create(getScreenAt(screen));
+    lv_obj_add_style(*label, style, 0);
+    lv_obj_align(*label, LV_ALIGN_TOP_LEFT, x, y);
+	lv_label_set_text(*label, "Text");
+}
+
+void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h) {
+	*dropdown = lv_dropdown_create(getScreenAt(screen));
+	lv_dropdown_set_options(*dropdown, options.c_str());
+	lv_dropdown_set_symbol(*dropdown, NULL);
+	lv_obj_add_style(*dropdown, &styleButton, 0);
+	lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton, 0);
+	lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButtonSelected, LV_PART_SELECTED);
+	lv_obj_set_size(*dropdown, w, h);
+	lv_obj_align(*dropdown, LV_ALIGN_TOP_LEFT, x, y);
+}
+
+void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y) {
+	*button = lv_btn_create(getScreenAt(screen));
+	lv_obj_align(*button, LV_ALIGN_TOP_LEFT, x, y);
+	lv_obj_add_style(*button, &styleBox, 0);
+	lv_obj_clear_flag(*button, LV_OBJ_FLAG_CLICKABLE);
+	*label = lv_label_create(*button);
+	lv_obj_add_style(*label, &styleTextHeader3, 0);
+}
+
+// Display Parsing Methods
+string parseCurrentMode() {
+	switch (getCurrentMode()) {
+		case 1: return "Competition";
+		case 2: return "Skills";
+		default: return "Unknown";
+	}
+}
+
+string parseCurrentPeriod() {
+	switch (getCurrentPeriod()) {
+		case 1: return "Initializing";
+		case 2: return "Driver Controlled";
+		case 3: return "Autonomous Controlled";
+		default: return "Unknown";
+	}
+}
+
+string parseCurrentSide() {
+	switch (getCurrentSide()) {
+		case 1: return "Red";
+		case 2: return "Blue";
+		default: return "Unknown";
+	}
+}
+
+string parseCurrentPosition() {
+	switch (getCurrentPosition()) {
+		case 1: return "Positive";
+		case 2: return "Negative";
+		default: return "Unknown";
+	}
+}
+
+string parseCurrentAutonomous() {
+	switch (getCurrentAutonomous()) {
+		case 1: return "Program #1: Preload Score";
+		case 2: return "Program #2";
+		case 3: return "Program #3";
+		case 4: return "Program #4";
+		default: return "Unknown";
+	}
+}
+
+string parseCurrentScreen() {
+	switch (getCurrentScreen()) {
+		case 0: return "Main Menu";
+		case 1: return "Autonomous";
+		case 2: return "Electronics";
+		case 3: return "Information";
+		default: return "Unknown";
+	}
+}
+
+// Display Helper Methods
+lv_obj_t* getScreenAt(int n) {
+	switch (n) {
+		case -1:
+			return lv_scr_act();
+		case 0:
+			return screenMainMenu;
+		case 1:
+			return screenAutonomous;
+		case 2:
+			return screenElectronics;
+		case 3:
+			return screenInformation;
+		default:
+			return screenMainMenu;
+	}
 }
 
 /* Set Methods */
-void setCurrentPeriod(int n) { currentPeriod = n; }
-void setCurrentSide(int n) { currentSide = n; }
-void setCurrentPosition(int n) { currentPosition = n; }
-void setCurrentAutonomous(int n) { currentAutonomous = n; }
 void setLeftDriveTarget(int n) { leftDriveTarget = n; }
 void setRightDriveTarget(int n) { rightDriveTarget = n; }
 void setIntakeScoreTarget(int n) { intakeScoreTarget = n; }
@@ -686,12 +668,15 @@ void setPistonTarget(int n) { pistonTarget = n; }
 void setEnablePID(bool b) { enablePID = b; }
 void setLeftDriveActual(int n) { leftDriveActual = n; }
 void setRightDriveActual(int n) { rightDriveActual = n; }
+void setCurrentState(bool b) { currentState = b; }
+void setCurrentMode(int n) { currentMode = n; }
+void setCurrentPeriod(int n) { currentPeriod = n; }
+void setCurrentSide(int n) { currentSide = n; }
+void setCurrentPosition(int n) { currentPosition = n; }
+void setCurrentAutonomous(int n) { currentAutonomous = n; }
+void setCurrentScreen(int n) { currentScreen = n; }
 
 /* Get Methods */
-int getCurrentPeriod() { return currentPeriod; }
-int getCurrentSide() { return currentSide; }
-int getCurrentPosition() { return currentPosition; }
-int getCurrentAutonomous() { return currentAutonomous; }
 int getLeftDriveTarget() { return leftDriveTarget; }
 int getRightDriveTarget() { return rightDriveTarget; }
 int getIntakeScoreTarget() { return intakeScoreTarget; }
@@ -699,3 +684,10 @@ int getPistonTarget() { return pistonTarget; }
 int getLeftDriveActual() { return leftDriveActual; }
 int getRightDriveActual() { return rightDriveActual; }
 bool getEnablePID() { return enablePID; }
+bool getCurrentState() { return currentState; }
+int getCurrentMode() { return currentMode; }
+int getCurrentPeriod() { return currentPeriod; }
+int getCurrentSide() { return currentSide; }
+int getCurrentPosition() { return currentPosition; }
+int getCurrentAutonomous() { return currentAutonomous; }
+int getCurrentScreen() { return currentScreen; }
