@@ -86,11 +86,14 @@ void createScreen(lv_obj_t **screen);
 void createTextStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor);
 void createButtonStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor);
 void createBoxStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor);
+void createTableStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor);
 void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int w, int h);
 void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom);
 void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style);
-void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h);
+void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h, bool header);
 void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y);
+void createTable(int screen, lv_obj_t **table, int x, int y, int r, int c);
+void createTableFormat(lv_event_t *e);
 
 // Display Parsing Methods
 string parseCurrentMode(void);
@@ -190,6 +193,7 @@ int currentScreen{0};
 
 // Colors
 lv_color_t colorWhite;
+lv_color_t colorLightGray;
 lv_color_t colorBlack;
 lv_color_t colorDamienGreen;
 lv_color_t colorSpartanGold;
@@ -214,9 +218,12 @@ lv_draw_rect_dsc_t dscRectBody;
 lv_style_t styleTextHeader1;
 lv_style_t styleTextHeader2;
 lv_style_t styleTextHeader3;
-lv_style_t styleButton;
-lv_style_t styleButtonSelected;
+lv_style_t styleButton1;
+lv_style_t styleButton1Selected;
+lv_style_t styleButton2;
+lv_style_t styleButton2Selected;
 lv_style_t styleBox;
+lv_style_t styleTableCell;
 
 // Screens
 vector<vector<lv_obj_t *>> screenObjects;
@@ -242,6 +249,19 @@ lv_obj_t *dropdownAutonomousMode;
 lv_obj_t *dropdownAutonomousSide;
 lv_obj_t *dropdownAutonomousPosition;
 lv_obj_t *dropdownAutonomousAutonomous;
+
+// Electronics Screen
+lv_obj_t *tableElectronicsMotors;
+lv_obj_t *tableElectronicsADI;
+
+// Information Screen
+lv_obj_t *buttonInfoGame;
+lv_obj_t *textInfoGame;
+lv_obj_t *buttonInfoCoaches;
+lv_obj_t *textInfoCoaches;
+lv_obj_t *buttonInfoCode;
+lv_obj_t *textInfoCode;
+lv_obj_t *tableInfoTeam;
 
 // Electronics Screen
 // TODO: Implement Electronics Screen

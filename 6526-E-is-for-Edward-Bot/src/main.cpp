@@ -321,17 +321,18 @@ void updateDisplay() {
 			updateController();
 		}
 
-		delay(waitInterval); // Wait
+		delay(250); // Wait
 	}
 }
 
 void updateScreen() {
 	int n = lv_dropdown_get_selected(dropdownHeader);
-	if (n == currentScreen) {
+
+	if (n == getCurrentScreen()) {
 		return;
 	}
 	else {
-		currentScreen = n;
+		setCurrentScreen(n);
 		updateScreenTo(getScreenAt(n));
 	}
 }
@@ -362,13 +363,22 @@ void updateGameInformation() {
 }
 
 void updateImages() {
-	switch (getCurrentMode()) {
-		case 1: 
-			updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64);
-			break;
-		case 2: 
-			updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutSkills, 0.64);
-			break;
+	int n = lv_dropdown_get_selected(dropdownAutonomousMode) + 1;
+
+	if (n == getCurrentMode()) {
+		return;
+	}
+	else {
+		setCurrentMode(n);
+
+		switch (n) {
+			case 1: 
+				updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64);
+				break;
+			case 2: 
+				updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutSkills, 0.64);
+				break;
+		}
 	}
 }
 
@@ -386,10 +396,86 @@ void updateCanvas() {
 }
 
 void updateText() {
+	// Header
 	lv_label_set_text(textHeader1, "6526-E");
 	lv_label_set_text(textHeader2, "E-is-for-Edward\nDamien Robotics");
-	string stringInfo = "Mode: " + parseCurrentMode() + "\nPeriod: " + parseCurrentPeriod() + "\nSide: " + parseCurrentSide()  + "\nStart Position: " + parseCurrentPosition() + "\nSelected Autonomous: " + parseCurrentAutonomous();
-    lv_label_set_text(textMainInfo, stringInfo.c_str());
+	
+	// Main Menu
+	string stringMainInfo = "Mode: " + parseCurrentMode() + "\nPeriod: " + parseCurrentPeriod() + "\nSide: " + parseCurrentSide()  + "\nStart Position: " + parseCurrentPosition() + "\nSelected Autonomous: " + parseCurrentAutonomous();
+    lv_label_set_text(textMainInfo, stringMainInfo.c_str());
+	
+	// Electronics	
+	string arrayElectronicsMotors[10][4] = {
+		{"Port", "Description", "Targets", "Actuals"},
+		{"1", "Right Drive", to_string(rightDriveTarget), to_string(rightDriveActual)},
+		{"2", "Right Drive", to_string(rightDriveTarget), to_string(rightDriveActual)},
+		{"-9", "Left Drive", to_string(leftDriveTarget), to_string(leftDriveActual)},
+		{"-10", "Left Drive", to_string(leftDriveTarget), to_string(leftDriveActual)},
+		{"7", "Intake-Score", to_string(intakeScoreTarget), ""}, 
+		{"8", "Intake-Score", to_string(intakeScoreTarget), ""}, 
+		{"", "", "", ""},
+		{"", "", "", ""},
+		{"", "", "", ""}};
+
+	lv_table_set_col_width(tableElectronicsMotors, 0, 40);
+	lv_table_set_col_width(tableElectronicsMotors, 1, 90);
+	lv_table_set_col_width(tableElectronicsMotors, 2, 50);
+	lv_table_set_col_width(tableElectronicsMotors, 3, 50);
+
+	for (int r = 0; r < lv_table_get_row_cnt(tableElectronicsMotors); r++) {
+		for (int c = 0; c < lv_table_get_col_cnt(tableElectronicsMotors); c++) {
+			lv_table_set_cell_value(tableElectronicsMotors, r, c, arrayElectronicsMotors[r][c].c_str());
+		}
+	}
+
+	string arrayElectronicsADI[10][3] = {
+		{"Port", "Description", "Targets"},
+		{"A", "Pneumatics", to_string(pistonTarget)},
+		{"B", "", ""},
+		{"C", "", ""},
+		{"D", "", ""},
+		{"E", "", ""},
+		{"F", "", ""},
+		{"G", "", ""},
+		{"H", "", ""},
+		{"21", "Radio", ""}};
+
+	lv_table_set_col_width(tableElectronicsADI, 0, 40);
+	lv_table_set_col_width(tableElectronicsADI, 1, 90);
+	lv_table_set_col_width(tableElectronicsADI, 2, 50);
+
+	for (int r = 0; r < lv_table_get_row_cnt(tableElectronicsADI); r++) {
+		for (int c = 0; c < lv_table_get_col_cnt(tableElectronicsADI); c++) {
+			lv_table_set_cell_value(tableElectronicsADI, r, c, arrayElectronicsADI[r][c].c_str());
+		}
+	}
+
+	// Information
+	lv_label_set_text(textInfoGame, "VEX V5 Robotics Competition        \n2024-2025 Game: High Stakes");
+	lv_label_set_text(textInfoCoaches, "Coaches: Ms. Maricic, Mr. Geiger,\nMr. Bikmaz, Mr. McElrea, Paige,\nand others.");
+	lv_label_set_text(textInfoCode, "Programmed in C++ using the       \nPROS framework and the LVGL\ngraphics library by Teddy.");
+
+	string arrayInfoTeam[10][3] = {
+		{"Name", "Grade", "Role"},
+		{"Edward Deng", "12", "Lead Builder"},
+		{"Andres Gomez", "10", "Builder, Driver"},
+		{"Aidan Reyes", "10", "Programmer, Builder"},
+		{"Rylan Robles", "12", "Lead Driver, Builder"},
+		{"Teddy Wachtler", "12", "Lead Programmer"},
+		{"", "", ""},
+		{"", "", ""},
+		{"", "", ""},
+		{"", "", ""}};
+
+	lv_table_set_col_width(tableInfoTeam, 0, 95);
+	lv_table_set_col_width(tableInfoTeam, 1, 40);
+	lv_table_set_col_width(tableInfoTeam, 2, 120);
+
+	for (int r = 0; r < lv_table_get_row_cnt(tableInfoTeam); r++) {
+		for (int c = 0; c < lv_table_get_col_cnt(tableInfoTeam); c++) {
+			lv_table_set_cell_value(tableInfoTeam, r, c, arrayInfoTeam[r][c].c_str());
+		}
+	}	
 }
 
 void updateController() {
@@ -407,18 +493,12 @@ void initializeAllGraphics() {
 
 void initializeColors() {
 	createColor(&colorWhite, 0xFFFFFF);
+	createColor(&colorLightGray, 0xEFEFEF);
 	createColor(&colorBlack, 0x000000);
 	createColor(&colorDamienGreen, 0x244546);
 	createColor(&colorSpartanGold, 0xFFB81C);
 	createColor(&colorMilenniumGold, 0xB3A369);
-	createColor(&colorWhite, 0xA7A8A9);
-
-	colorWhite = lv_color_hex(0xFFFFFF);
-	colorBlack = lv_color_hex(0x000000);
-    colorDamienGreen = lv_color_hex(0x244546);
-    colorSpartanGold = lv_color_hex(0xFFB81C);
-    colorMilenniumGold = lv_color_hex(0xB3A369);
-    colorCoolGray = lv_color_hex(0xA7A8A9);
+	createColor(&colorCoolGray, 0xA7A8A9);
 }
 
 void initializeFonts() {
@@ -452,9 +532,12 @@ void initializeStyles() {
 	createTextStyle(&styleTextHeader1, &fontTrajan40, colorSpartanGold);
 	createTextStyle(&styleTextHeader2, &fontFauna14, colorSpartanGold);
 	createTextStyle(&styleTextHeader3, &fontCalibri13, colorBlack);
-	createButtonStyle(&styleButton, &fontFauna14, colorSpartanGold, colorDamienGreen, colorBlack);
-	createButtonStyle(&styleButtonSelected, &fontFauna14, colorWhite, colorSpartanGold, colorBlack);
-	createBoxStyle(&styleBox, &fontCalibri13, colorBlack, colorCoolGray, colorBlack);
+	createButtonStyle(&styleButton1, &fontFauna14, colorSpartanGold, colorDamienGreen, colorBlack);
+	createButtonStyle(&styleButton1Selected, &fontFauna14, colorWhite, colorSpartanGold, colorBlack);
+	createButtonStyle(&styleButton2, &fontCalibri13, colorBlack, colorWhite, colorBlack);
+	createButtonStyle(&styleButton2Selected, &fontCalibri13, colorSpartanGold, colorLightGray, colorBlack);
+	createBoxStyle(&styleBox, &fontCalibri13, colorBlack, colorWhite, colorBlack);
+	createTableStyle(&styleTableCell, &fontCalibri13, colorBlack, colorWhite, colorBlack);
 }
 
 void initializeAllScreens() {
@@ -480,7 +563,7 @@ void initializeHeader() {
 	createImage(-1, &imgHeader, 5, 5, &dscImgSpartanHelmetGold, 0.22);
 	createLabel(-1, &textHeader1, 43, 0, &styleTextHeader1);
 	createLabel(-1, &textHeader2, 185, 5, &styleTextHeader2);
-	createDropdown(-1, &dropdownHeader, "Main Menu\nAutonomous\nElectronics\nInformation", 345, 5, 130, 40);
+	createDropdown(-1, &dropdownHeader, "Main Menu\nAutonomous\nElectronics\nInformation", 345, 5, 130, 40, true);
 
 	screenObjects.push_back({canvasHeader, imgHeader, textHeader1, textHeader2, dropdownHeader});
 }
@@ -493,20 +576,28 @@ void initializeScreenMain() {
 }
 
 void initializeScreenAutonomous() {
-	createDropdown(1, &dropdownAutonomousMode, "Competiton\nSkills", 5, 55, 100, 40);
-	createDropdown(1, &dropdownAutonomousSide, "Red\nBlue", 105, 55, 100, 40);
-	createDropdown(1, &dropdownAutonomousPosition, "Positive\nNegative", 205, 55, 100, 40);
-	createDropdown(1, &dropdownAutonomousAutonomous, "Program #1\nProgram #2\nProgram #3\nProgram #4", 305, 55, 100, 40);
+	createDropdown(1, &dropdownAutonomousMode, "Competiton\nSkills", 10, 60, 110, 40, false);
+	createDropdown(1, &dropdownAutonomousSide, "Red\nBlue", 125, 60, 110, 40, false);
+	createDropdown(1, &dropdownAutonomousPosition, "Positive\nNegative", 240, 60, 110, 40, false);
+	createDropdown(1, &dropdownAutonomousAutonomous, "Program #1\nProgram #2\nProgram #3\nProgram #4", 355, 60, 110, 40, false);
 
 	screenObjects.push_back({dropdownAutonomousMode, dropdownAutonomousSide, dropdownAutonomousPosition, dropdownAutonomousAutonomous});
 }
 
 void initializeScreenElectronics() {
-	// screenObjects.push_back({});
+	createTable(2, &tableElectronicsMotors, 10, 60, 10, 4);
+	createTable(2, &tableElectronicsADI, 258, 60, 10, 3);
+
+	screenObjects.push_back({tableElectronicsMotors, tableElectronicsADI});
 }
 
 void initializeScreenInformation() {
-	// screenObjects.push_back({});
+	createBox(3, &buttonInfoGame, &textInfoGame, 10, 60);
+	createBox(3, &buttonInfoCoaches, &textInfoCoaches, 10, 110);
+	createBox(3, &buttonInfoCode, &textInfoCode, 10, 176);
+	createTable(3, &tableInfoTeam, 204, 60, 10, 3);
+
+	screenObjects.push_back({buttonInfoGame, buttonInfoCoaches, buttonInfoCode, tableInfoTeam});
 }
 
 // Display Creation Methods
@@ -535,7 +626,7 @@ void createButtonStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textCo
 	lv_style_set_text_color(style, textColor);
 	lv_style_set_bg_color(style, bgColor);
 	lv_style_set_radius(style, 0);
-	lv_style_set_border_width(style, 3);
+	lv_style_set_border_width(style, 2);
 	lv_style_set_border_color(style, borderColor);
 }
 
@@ -547,6 +638,17 @@ void createBoxStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor
 	lv_style_set_bg_color(style, bgColor);
 	lv_style_set_radius(style, 0);
 	lv_style_set_border_width(style, 2);
+	lv_style_set_border_color(style, borderColor);
+}
+
+void createTableStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor) {
+	lv_style_init(style);
+	lv_style_set_text_font(style, textFont);
+	lv_style_set_text_color(style, textColor);
+	lv_style_set_pad_all(style, 0.5);
+	lv_style_set_bg_color(style, bgColor);
+	lv_style_set_radius(style, 0);
+	lv_style_set_border_width(style, 1);
 	lv_style_set_border_color(style, borderColor);
 }
 
@@ -568,13 +670,20 @@ void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style) 
 	lv_label_set_text(*label, "Text");
 }
 
-void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h) {
+void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h, bool header) {
 	*dropdown = lv_dropdown_create(getScreenAt(screen));
 	lv_dropdown_set_options(*dropdown, options.c_str());
 	lv_dropdown_set_symbol(*dropdown, NULL);
-	lv_obj_add_style(*dropdown, &styleButton, 0);
-	lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton, 0);
-	lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButtonSelected, LV_PART_SELECTED);
+	if (header) {
+		lv_obj_add_style(*dropdown, &styleButton1, 0);
+		lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton1, 0);
+		lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton1Selected, LV_PART_SELECTED);
+	}
+	else {
+		lv_obj_add_style(*dropdown, &styleButton2, 0);
+		lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton2, 0);
+		lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton2Selected, LV_PART_SELECTED);
+	}
 	lv_obj_set_size(*dropdown, w, h);
 	lv_obj_align(*dropdown, LV_ALIGN_TOP_LEFT, x, y);
 }
@@ -586,6 +695,31 @@ void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y) {
 	lv_obj_clear_flag(*button, LV_OBJ_FLAG_CLICKABLE);
 	*label = lv_label_create(*button);
 	lv_obj_add_style(*label, &styleTextHeader3, 0);
+}
+
+void createTable(int screen, lv_obj_t **table, int x, int y, int r, int c) {
+	*table = lv_table_create(getScreenAt(screen));
+	lv_obj_align(*table, LV_ALIGN_TOP_LEFT, x, y);
+	lv_obj_add_style(*table, &styleBox, 0);
+	lv_obj_add_style(*table, &styleTableCell, LV_PART_ITEMS);
+	lv_table_set_row_cnt(*table, r);
+	lv_table_set_col_cnt(*table, c);
+	lv_obj_add_event_cb(*table, createTableFormat, LV_EVENT_DRAW_PART_BEGIN, NULL); 
+}
+
+void createTableFormat(lv_event_t *e) {
+    lv_obj_t *table = lv_event_get_target(e);
+    lv_obj_draw_part_dsc_t *dsc = lv_event_get_draw_part_dsc(e);
+
+    if(dsc->part == LV_PART_ITEMS) {
+    	int r = dsc->id /  lv_table_get_col_cnt(table);
+    	int c = dsc->id - r * lv_table_get_col_cnt(table);
+    	
+		if (r % 2 == 1) {
+        	dsc->rect_dsc->bg_color = colorLightGray;
+            dsc->rect_dsc->bg_opa = LV_OPA_COVER;
+    	}
+    }
 }
 
 // Display Parsing Methods
@@ -608,8 +742,8 @@ string parseCurrentPeriod() {
 
 string parseCurrentSide() {
 	switch (getCurrentSide()) {
-		case 1: return "Red";
-		case 2: return "Blue";
+		case 1: return "Red      ";
+		case 2: return "Blue     ";
 		default: return "Unknown";
 	}
 }
