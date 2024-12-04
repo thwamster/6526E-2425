@@ -26,7 +26,7 @@ void disabled(void);
 void competition_initialize(void);
 
 /* Autonomous Period Task */
-void getAutonomousInputs(void);
+void controlInputsAutonomous(void);
 
 // Autonomous Programs
 void runAutonomous(void);
@@ -36,8 +36,9 @@ void runProgram3(void);
 void runProgram4(void);
 
 // Autonomous Helper Methods
-void moveForTime(vector<int*> targets, vector<int> values, int t);
+void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int t);
 void driveForTime(int r, int l, int t);
+void driveForDistance(int r, int l, int d);
 void intakeForTime(int i, int t);
 void scoreRing(void);
 void seizeGoal(void);
@@ -45,23 +46,50 @@ void releaseGoal(void);
 void delayA(int n = 0);
 
 /* Driver Controlled Period Task */
-void getDriverInputs(void);
+void controlInputsDriver(void);
 
-/* Robot Control System Task */
+// Driver Input Methods
+void updateInputsDriver(void);
+void updateToggles(void);
+void updateTogglePID(void);
+void updateTargets(void);
+void updateTargetDrivetrain(void);
+void updateTargetArm(void);
+void updateTargetIntakeScore(void);
+void updateTargetClamp(void);
+
+/* Universal Period Task */
+void controlInputsRobot(void);
+
+// Robot Input Methods
+void updateInputsRobot(void);
+void updateActuals(void);
+void updateActualDrivetrain(void);
+
+/* Robot System Task */
+void controlRobot(void);
+
+// Robot Update Methods
 void updateRobot(void);
+void updateRobotDrivetrain(void);
+void updateRobotArm(void);
+void updateRobotIntakeScore(void);
+void updateRobotClamp(void);
 
 // Robot Helper Methods
 int PID(int target, int sensor, double kP, double kI, double kD, int* I, int limitI, int* lastError);
 
 /* Display Control System Task */
-void updateDisplay(void);
-void updateScreen(void);
+void controlDisplay(void);
+void updateScreens(void);
 void updateScreenTo(lv_obj_t * screen);
 void updateGameInformation(void);
 void updateImages(void);
 void updateImageTo(lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom);
 void updateCanvas(void);
-void updateText(void);
+void updateTexts(void);
+void updateTextLabelTo(lv_obj_t **label, string text);
+void updateTextTableTo(lv_obj_t **table, vector<int> widths, vector<vector<string>> text);
 void updateController(void);
 
 // Display Initializaiton Methods
@@ -76,6 +104,7 @@ void initializeScreenMain(void);
 void initializeScreenAutonomous(void);
 void initializeScreenElectronics(void);
 void initializeScreenInformation(void);
+void initializeText(void);
 
 // Display Creation Methods
 void createColor(lv_color_t *color, int hex);
@@ -91,9 +120,13 @@ void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int w, int h);
 void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom);
 void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style);
 void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h, bool header);
+void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, void(*function)(lv_event_t *e));
 void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y);
 void createTable(int screen, lv_obj_t **table, int x, int y, int r, int c);
 void createTableFormat(lv_event_t *e);
+
+// Display Event Methods
+void eventAutonomousManual(lv_event_t *e);
 
 // Display Parsing Methods
 string parseCurrentMode(void);
@@ -107,13 +140,15 @@ string parseCurrentScreen(void);
 lv_obj_t* getScreenAt(int n);
 
 /* Set Methods */
-void setLeftDriveTarget(int n);
-void setRightDriveTarget(int n);
-void setIntakeScoreTarget(int n);
-void setPistonTarget(int n);
-void setEnablePID(bool b);
-void setLeftDriveActual(int n);
-void setRightDriveActual(int n);
+void setTargetDriveLeft(int n);
+void setTargetDriveRight(int n);
+void setTargetArm(int n);
+void setTargetIntake(int n);
+void setTargetScore(int n);
+void setTargetClamp(int n);
+void setTogglePID(bool b);
+void setActualDriveLeft(int n);
+void setActualDriveRight(int n);
 void setCurrentState(bool b);
 void setCurrentMode(int n);
 void setCurrentPeriod(int n);
@@ -123,13 +158,15 @@ void setCurrentAutonomous(int n);
 void setCurrentScreen(int n);
 
 /* Get Methods */
-int getLeftDriveTarget(void);
-int getRightDriveTarget(void);
-int getIntakeScoreTarget(void);
-int getPistonTarget(void);
-int getLeftDriveActual(void);
-int getRightDriveActual(void);
-bool getEnablePID(void);
+int getTargetDriveLeft(void);
+int getTargetDriveRight(void);
+int getTargetArm(void);
+int getTargetIntake(void);
+int getTargetScore(void);
+int getTargetClamp(void);
+int getActualDriveLeft(void);
+int getActualDriveRight(void);
+bool getTogglePID(void);
 bool getCurrentState(void);
 int getCurrentMode(void);
 int getCurrentPeriod(void);
@@ -147,40 +184,66 @@ const int autonDelay{300};
 
 // Tasks
 Mutex mutex;
-Task autonomousPeriod(getAutonomousInputs);
-Task driverControlledPeriod(getDriverInputs);
-Task robotControlSystem(updateRobot);
-Task displayControlSystem(updateDisplay);
+Task periodAutonomous(controlInputsAutonomous);
+Task periodDriverControlled(controlInputsDriver);
+Task periodUniversal(controlInputsRobot);
+Task systemRobot(controlRobot);
+Task systemDisplay(controlDisplay);
 
 // Controller
 Controller masterController(E_CONTROLLER_MASTER);
 
 // Electronics
-MotorGroup leftDriveMotors({-9, -10});
-MotorGroup rightDriveMotors({1,2});
-MotorGroup intakeMotor({7});
-MotorGroup scoreMotor({8}); 
-Pneumatics clampPistons(8, true);
-// TODO: Sensors
+MotorGroup motorsDriveLeft({-9, -10});
+MotorGroup motorsDriveRight({1, 2});
+MotorGroup motorsArm({3, -4});
+MotorGroup motorIntake({7});
+MotorGroup motorScore({8}); 
+Pneumatics pneumaticClamp(8, true);
+
+// Inputs
+struct {
+	int axis1{0};
+	int axis2{0};
+	int axis3{0};
+	int axis4{0};
+	int buttonX{0};
+	int buttonA{0};
+	int buttonB{0};
+	int buttonY{0};
+	int buttonUp{0};
+	int buttonRight{0};
+	int buttonDown{0};
+	int buttonLeft{0};
+	int buttonR1{0};
+	int buttonR2{0};
+	int buttonL1{0};
+	int buttonL2{0};
+} inputsDriver;
+struct {
+    int velocityL{0};
+    int velocityR{0};
+} inputsRobot;
 
 // Target Variables
-int leftDriveTarget{0};
-int rightDriveTarget{0};
-int intakeScoreTarget{0};
-int pistonTarget{0};
+int targetDriveLeft{0};
+int targetDriveRight{0};
+int targetArm{0};
+int targetIntake{0};
+int targetScore{0};
+int targetClamp{0};
 
 // Actual Variables
-int leftDriveActual{0};
-int rightDriveActual{0};
+int actualDriveLeft{0};
+int actualDriveRight{0};
 
 // Toggles
-bool enablePID{false};
+bool togglePID{false};
 
 /* Graphical Objects */
 // Constants
 const int displayWidth{480};
 const int displayHeight{240};
-static lv_color_t bufferAll[LV_CANVAS_BUF_SIZE_TRUE_COLOR(480, 240)];
 
 // Information
 bool currentState{false};
@@ -249,6 +312,8 @@ lv_obj_t *dropdownAutonomousMode;
 lv_obj_t *dropdownAutonomousSide;
 lv_obj_t *dropdownAutonomousPosition;
 lv_obj_t *dropdownAutonomousAutonomous;
+lv_obj_t *buttonAutonomousManual;
+lv_obj_t *textAutonomousManual;
 
 // Electronics Screen
 lv_obj_t *tableElectronicsMotors;
@@ -262,12 +327,6 @@ lv_obj_t *textInfoCoaches;
 lv_obj_t *buttonInfoCode;
 lv_obj_t *textInfoCode;
 lv_obj_t *tableInfoTeam;
-
-// Electronics Screen
-// TODO: Implement Electronics Screen
-
-// Information Screen
-// TODO: Implement Information Screen
 
 #ifdef __cplusplus
 } // extern "C"
