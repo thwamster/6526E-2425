@@ -3,7 +3,7 @@
 /* Competition Methods */
 void initialize() {
 
-	// Updsate graphics
+	// Update graphics
 	initializeAllGraphics();
 	setCurrentState(true);
 
@@ -76,6 +76,8 @@ void controlInputsAutonomous() {
 // Autonomous Programs
 void runAutonomous() {
 
+	setToggleBrake(true); // Updates brakes
+
 	// Select autonomous program
 	switch (getCurrentAutonomous()) {
 
@@ -118,67 +120,62 @@ void runProgram1() {
 	delayA(3000);
 }
 
-int TEST_VALUE;
-lv_obj_t *dropdown_TEST_DROPDOWN;
-
 void runProgram2() {
-	TEST_VALUE = (TEST_VALUE + 1) * 100;
 
-	// Testing
-	driveForTime(-127, -127, TEST_VALUE);
-}
-
-void runProgram3() {
-	//drive backwards, clamp goal, and score preload
+	// Drive backwards, clamp goal, and score preload
     driveForTime(-127, -127, 320);
     delayA(400);
     seizeGoal();
     delayA(320);
     scoreRing();
 
-    //turn right towards north stack and score bottom ring
+    // Turn right towards north stack and score bottom ring
     driveForTime(127, -127, 300);
     delayA(320);
     driveAndIntakeForTime(127, 127, 90, 80, 900);
     delayA(200);
 
-    //turn, drive to the corner pile, and score the bottom ring
+    // Turn, drive to the corner pile, and score the bottom ring
     driveForTime(127, -127, 120);
     delayA(200);
     driveAndIntakeForTime(127, 127, 90, 80, 1250);
     delayA(300);
-
 }
+
+void runProgram3() {}
 
 void runProgram4() {}
 
 // Autonomous Helper Methods
-void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int t) {
+void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int milliseconds) {
+	updateTargetsTo(targets, values);
+	delay(milliseconds); // Wait
+	updateTargetsTo(targets, vector<int>(values.size(), 0));
+}
 
-	// Updates all values
+void updateTargetsTo(vector<void (*)(int n)> targets, vector<int> values) {
+	// Resets all values
 	for (int i = 0; i < targets.size() && i < values.size(); i++) {
 		targets[i](values[i]);
 	}
-
-	delay(t); // Wait
-
-	// Resets all values
-	for (int i = 0; i < targets.size() && i < values.size(); i++) {
-		targets[i](0);
-	}
 }
 
-void driveForTime(int r, int l, int t) { moveForTime({&setTargetDriveLeft, &setTargetDriveRight}, {r, l}, t); }
-void driveForDistance(int r, int l, int d) { moveForTime({&setTargetDriveLeft, &setTargetDriveRight}, {r, l}, 1 * d + 0); }
-void intakeForTime(int i, int s, int t) { moveForTime({&setTargetIntake, &setTargetScore}, {i, s}, t); }
-void driveAndIntakeForTime(int r, int l, int i, int s, int t) { moveForTime({&setTargetDriveRight, &setTargetDriveLeft, &setTargetIntake, &setTargetScore}, {r, l, i, s}, t); }
+void driveForTime(int right, int left, int milliseconds) { moveForTime({&setTargetDriveLeft, &setTargetDriveRight}, {right, left}, milliseconds); }
+void intakeForTime(int intake, int score, int milliseconds) { moveForTime({&setTargetIntake, &setTargetScore}, {intake, score}, milliseconds); }
+void driveAndIntakeForTime(int right, int left, int intake, int score, int milliseconds) { moveForTime({&setTargetDriveRight, &setTargetDriveLeft, &setTargetIntake, &setTargetScore}, {right, left, intake, score}, milliseconds); }
 void scoreRing() { intakeForTime(90, 80, 2500); }
 void seizeGoal() { setTargetClamp(1); }
 void releaseGoal() { setTargetClamp(0); }
-void delayA(int n) { (n < autonDelay) ? delay(autonDelay) : delay(n); }
+void delayA(int milliseconds) { (milliseconds < autonDelay) ? delay(autonDelay) : delay(milliseconds); }
+
+// Autonomous Parsing Methods
+int parseDistanceToTime(int speed, int centimeters) { return 10 * centimeters + 60; }
+int parseAngleToTime(int speed, int degrees) { return 1 * degrees + 0; }
 
 /* Driver Controlled Period Task */
 void controlInputsDriver() {
+
+	setToggleBrake(false); // Updates brakes
 
 	// Control Loop
 	while (true) {
@@ -188,10 +185,14 @@ void controlInputsDriver() {
 
 		mutex.take(maxInterval); // Begin Exclusivity
 
-		// Update stores values
-		updateToggles();
-		updateTargets();
-		updateActuals();
+		// Checks if the targets should be updated
+		if (!getToggleManualAutonomous()) {
+
+			// Update stored values
+			updateToggles();
+			updateTargets();
+			updateActuals();
+		}
 
 		mutex.give(); // End Exclusivity
 
@@ -225,21 +226,40 @@ void updateToggles() {
 
 	// Calls helper methods
 	updateTogglePID();
+	updateToggleBrake();
+	updateToggleKillSwitch();
 }
 
 void updateTogglePID() {
-	static int aDelayCount{0};
 
-	// Checks if A button is pressed, and hasn't been pressed for a delay
-	if (inputsDriver.buttonA == 1 && aDelayCount >= doubleInputDelay) {
+	static int aDelayCount{0};
+	updateToggleTo(&setTogglePID, &getTogglePID, inputsDriver.buttonA, &aDelayCount);
+}
+
+void updateToggleBrake() {
+
+	static int bDelayCount{0};
+	updateToggleTo(&setToggleBrake, &getToggleBrake, inputsDriver.buttonB, &bDelayCount);
+}
+
+void updateToggleKillSwitch() {
+	
+	static int xDelayCount{0};
+	updateToggleTo(&setToggleKillSwitch, &getToggleKillSwitch, inputsDriver.buttonX, &xDelayCount);
+}
+
+void updateToggleTo(void (*set)(bool value), bool (*get)(void), int value, int *count) {
+
+	// Checks if button is pressed, and hasn't been pressed for a delay
+	if (value == 1 && *count >= doubleInputDelay) {
 
 		// Flips the toggle
-		setTogglePID(!setTogglePID);
-		aDelayCount = 0;
+		set(!get());
+		*count = 0;
 	}
 
 	// Increments the delay count
-	aDelayCount++;
+	*count++;
 }
 
 void updateTargets() {
@@ -335,7 +355,9 @@ void controlRobot() {
 
 		mutex.take(maxInterval); // Begin Exclusivity
 
-		updateRobot();
+		if (!getToggleKillSwitch()) {
+			updateRobot();
+		}
 
 		mutex.give(); // End Exclusivity
 
@@ -349,6 +371,7 @@ void updateRobot() {
 	updateRobotArm();
 	updateRobotIntakeScore();
 	updateRobotClamp();
+	updateRobotBrakes();
 }
 
 void updateRobotDrivetrain() {
@@ -385,6 +408,21 @@ void updateRobotClamp() {
 	}
 }
 
+void updateRobotBrakes() {
+	if (!getToggleBrake() && !getToggleManualAutonomous()) {
+		motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_COAST);
+		motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_COAST);
+	}
+	else {
+		motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+		motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+	}
+	
+	motorsArm.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+	motorIntake.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+	motorScore.set_brake_mode_all(MOTOR_BRAKE_HOLD); 
+}
+
 // Robot Helper Methods
 int PID(int target, int sensor, double kP, double kI, double kD, int* I, int limitI, int* lastError) {
 	int PID = 0;
@@ -416,6 +454,7 @@ void controlDisplay() {
 		if (currentState) { 
 			updateScreens();
 			updateGameInformation();
+			updateDropdowns();
 			updateImages();
 			updateCanvas();
 			updateTexts();
@@ -461,29 +500,51 @@ void updateScreenTo(lv_obj_t *screen) {
 }
 
 void updateGameInformation() {
-	setCurrentMode(lv_dropdown_get_selected(dropdownAutonomousMode) + 1);
 	setCurrentSide(lv_dropdown_get_selected(dropdownAutonomousSide) + 1);
 	setCurrentPosition(lv_dropdown_get_selected(dropdownAutonomousPosition) + 1);
 	setCurrentAutonomous(lv_dropdown_get_selected(dropdownAutonomousAutonomous) + 1);
-	TEST_VALUE = lv_dropdown_get_selected(dropdown_TEST_DROPDOWN);
 }
 
 void updateImages() {
 	switch (getCurrentMode()) {
-		case 1: 
+		case 1:
 			switch (getCurrentSide()) {
 				case 1:
-					updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64, true);
+					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, true);
 					break;
 				case 2:
-					updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64, false);
+					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, false);
 					break;
 			}
 			break;
-		case 2: 
-			updateImageTo(&imgMainLayout, 295, 55, &dscImgLayoutSkills, 0.64, false);
+		case 2:
+			updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutSkills, 0.64, false);
 			break;
 	}
+}
+
+void updateDropdowns() {
+	int n = lv_dropdown_get_selected(dropdownAutonomousMode) + 1;
+
+	if (n == getCurrentMode()) {
+		return;
+	}
+	else {
+		setCurrentMode(n);
+
+		switch (getCurrentMode()) {
+			case 1:
+				updateDropdownOptionsTo(&dropdownAutonomousSide, "Red\nBlue");
+				break;
+			case 2:
+				updateDropdownOptionsTo(&dropdownAutonomousSide, "Red");
+				break;
+		}
+	}
+}
+
+void updateDropdownOptionsTo(lv_obj_t **dropdown, string options) {
+	lv_dropdown_set_options(*dropdown, options.c_str());
 }
 
 void updateImageTo(lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom, bool flipped) {
@@ -517,6 +578,16 @@ void updateTexts() {
 		"Start Position: " + parseCurrentPosition() + "\n" +
 		"Selected Autonomous: " + parseCurrentAutonomous());
 	
+	// Autonomous
+	if (!getToggleManualAutonomous()) {
+		updateTextLabelTo(&textAutonomousManual, empty +
+			"Manual Autonomous");
+	}
+	else {
+		updateTextLabelTo(&textAutonomousManual, empty +
+			"Autonomous Running");
+	}
+
 	// Electronics
 	updateTextTableTo(&tableElectronicsMotors,
 		{40, 90, 50, 50}, {
@@ -655,20 +726,19 @@ void initializeHeader() {
 
 void initializeScreenMain() {
 	createBox(0, &buttonMainInfo, &textMainInfo, 10, 60);
-	createImage(0, &imgMainLayout, 295, 55, &dscImgLayoutVex, 0.64);
 
-	screenObjects.push_back({buttonMainInfo, imgMainLayout});
+	screenObjects.push_back({buttonMainInfo});
 }
 
 void initializeScreenAutonomous() {
 	createDropdown(1, &dropdownAutonomousMode, "Competiton\nSkills", 10, 60, 110, 40, false);
-	createDropdown(1, &dropdownAutonomousSide, "Red\nBlue", 125, 60, 110, 40, false);
-	createDropdown(1, &dropdownAutonomousPosition, "Positive\nNegative", 240, 60, 110, 40, false);
-	createDropdown(1, &dropdownAutonomousAutonomous, "Program #1\nProgram #2\nProgram #3\nProgram #4", 355, 60, 110, 40, false);
-	createButton(1, &buttonAutonomousManual, &textAutonomousManual, 10, 200, 150, 40, eventAutonomousManual);
-	createDropdown(1, &dropdown_TEST_DROPDOWN, "0\n1\n2\n3\n4\n5\n6", 200, 200, 110, 40, false);
+	createDropdown(1, &dropdownAutonomousSide, "Red\nBlue", 10, 105, 110, 40, false);
+	createDropdown(1, &dropdownAutonomousPosition, "Positive\nNegative", 10, 150, 110, 40, false);
+	createDropdown(1, &dropdownAutonomousAutonomous, "Program #1\nProgram #2\nProgram #3\nProgram #4", 10, 195, 110, 40, false);
+	createButton(1, &buttonAutonomousManual, &textAutonomousManual, 125, 60, 160, 40, eventAutonomousManual);
+	createImage(1, &imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64);
 
-	screenObjects.push_back({dropdownAutonomousMode, dropdownAutonomousSide, dropdownAutonomousPosition, dropdownAutonomousAutonomous, buttonAutonomousManual, dropdown_TEST_DROPDOWN});
+	screenObjects.push_back({dropdownAutonomousMode, dropdownAutonomousSide, dropdownAutonomousPosition, dropdownAutonomousAutonomous, buttonAutonomousManual, imgAutonomousLayout});
 }
 
 void initializeScreenElectronics() {
@@ -695,10 +765,6 @@ void initializeText() {
 		"6526-E");
 	updateTextLabelTo(&textHeader2, empty +
 		"E-is-for-Edward\nDamien Robotics");
-
-	// Autonomous
-	updateTextLabelTo(&textAutonomousManual, empty +
-		"Manual Autonomous");
 
 	// Information
 	updateTextLabelTo(&textInfoGame, empty +
@@ -779,12 +845,12 @@ void createTableStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textCol
 	lv_style_set_border_color(style, borderColor);
 }
 
-void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int w, int h) {
+void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int width, int height) {
 	static lv_color_t bufferAll[LV_CANVAS_BUF_SIZE_TRUE_COLOR(480, 240)];
 
 	*canvas = lv_canvas_create(getScreenAt(screen));
 	lv_obj_align(*canvas, LV_ALIGN_TOP_LEFT, x, y);
-    lv_canvas_set_buffer(*canvas, bufferAll, w, h, LV_IMG_CF_TRUE_COLOR);
+    lv_canvas_set_buffer(*canvas, bufferAll, width, height, LV_IMG_CF_TRUE_COLOR);
 }
 
 void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom) {
@@ -799,9 +865,9 @@ void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style) 
 	lv_label_set_text(*label, "Text");
 }
 
-void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h, bool header) {
+void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int width, int height, bool header) {
 	*dropdown = lv_dropdown_create(getScreenAt(screen));
-	lv_dropdown_set_options(*dropdown, options.c_str());
+	updateDropdownOptionsTo(dropdown, options);
 	lv_dropdown_set_symbol(*dropdown, NULL);
 	if (header) {
 		lv_obj_add_style(*dropdown, &styleButton1, 0);
@@ -813,15 +879,15 @@ void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int 
 		lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton2, 0);
 		lv_obj_add_style(lv_dropdown_get_list(*dropdown), &styleButton2Selected, LV_PART_SELECTED);
 	}
-	lv_obj_set_size(*dropdown, w, h);
+	lv_obj_set_size(*dropdown, width, height);
 	lv_obj_align(*dropdown, LV_ALIGN_TOP_LEFT, x, y);
 }
 
-void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int w, int h, void(*function)(lv_event_t *e)) {
+void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int width, int height, void(*function)(lv_event_t *event)) {
 	*button = lv_btn_create(getScreenAt(screen));
-	lv_obj_set_size(*button, w, h);
+	lv_obj_set_size(*button, width, height);
 	lv_obj_align(*button, LV_ALIGN_TOP_LEFT, x, y);
-	lv_obj_add_style(*button, &styleBox, 0);
+	lv_obj_add_style(*button, &styleButton2, 0);
 	*label = lv_label_create(*button);
 	lv_obj_add_style(*label, &styleTextHeader3, 0);
 	lv_obj_add_event_cb(*button, function, LV_EVENT_CLICKED, NULL);
@@ -836,19 +902,20 @@ void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y) {
 	lv_obj_add_style(*label, &styleTextHeader3, 0);
 }
 
-void createTable(int screen, lv_obj_t **table, int x, int y, int r, int c) {
+void createTable(int screen, lv_obj_t **table, int x, int y, int rows, int columns) {
 	*table = lv_table_create(getScreenAt(screen));
 	lv_obj_align(*table, LV_ALIGN_TOP_LEFT, x, y);
 	lv_obj_add_style(*table, &styleBox, 0);
 	lv_obj_add_style(*table, &styleTableCell, LV_PART_ITEMS);
-	lv_table_set_row_cnt(*table, r);
-	lv_table_set_col_cnt(*table, c);
-	lv_obj_add_event_cb(*table, createTableFormat, LV_EVENT_DRAW_PART_BEGIN, NULL); 
+	lv_table_set_row_cnt(*table, rows);
+	lv_table_set_col_cnt(*table, columns);
+	lv_obj_add_event_cb(*table, eventTableFormat, LV_EVENT_DRAW_PART_BEGIN, NULL); 
 }
 
-void createTableFormat(lv_event_t *e) {
-    lv_obj_t *table = lv_event_get_target(e);
-    lv_obj_draw_part_dsc_t *dscCell = lv_event_get_draw_part_dsc(e);
+// Display Event Methods
+void eventTableFormat(lv_event_t *event) {
+    lv_obj_t *table = lv_event_get_target(event);
+    lv_obj_draw_part_dsc_t *dscCell = lv_event_get_draw_part_dsc(event);
 	lv_draw_rect_dsc_t *dscRectCell = (*dscCell).rect_dsc;
 
     if ((*dscCell).part == LV_PART_ITEMS) {
@@ -862,18 +929,16 @@ void createTableFormat(lv_event_t *e) {
     }
 }
 
-// Display Event Methods
-void eventAutonomousManual(lv_event_t *e) {
-	lv_obj_t *button = lv_event_get_target(e);
-    lv_obj_t *label = lv_obj_get_child(button, 0);
+void eventAutonomousManual(lv_event_t *event) {
 
-	lv_label_set_text(label, "Running");
-
-	periodDriverControlled.suspend();
-	runAutonomous();
-	periodDriverControlled.resume();
-
-	lv_label_set_text(label, "Manual Autonomous");
+	// Manually triggers the autonomous program
+	delayA();
+	setToggleManualAutonomous(true);
+	delayA(500);
+	runAutonomous(); // Runs the program
+	delayA(500);
+	setToggleManualAutonomous(false);
+	delayA();
 }
 
 // Display Parsing Methods
@@ -932,8 +997,8 @@ string parseCurrentScreen() {
 }
 
 // Display Helper Methods
-lv_obj_t* getScreenAt(int n) {
-	switch (n) {
+lv_obj_t* getScreenAt(int screen) {
+	switch (screen) {
 		case -1:
 			return lv_scr_act();
 		case 0:
@@ -951,6 +1016,10 @@ lv_obj_t* getScreenAt(int n) {
 
 /* Set Methods */
 void setTogglePID(bool b) { togglePID = b; }
+void setToggleBrake(bool b) { toggleBrake = b; }
+void setToggleKillSwitch(bool b) { toggleKillSwitch = b; }
+void setToggleManualAutonomous(bool b) { toggleManualAutonomous = b; }
+void setActualDriveLeft(int n);
 void setTargetDriveLeft(int n) { targetDriveLeft = n; }
 void setTargetDriveRight(int n) { targetDriveRight = n; }
 void setTargetArm(int n) { targetArm = n; }
@@ -969,6 +1038,9 @@ void setCurrentScreen(int n) { currentScreen = n; }
 
 /* Get Methods */
 bool getTogglePID() { return togglePID; }
+bool getToggleBrake() { return toggleBrake; }
+bool getToggleKillSwitch() { return toggleKillSwitch; }
+bool getToggleManualAutonomous() { return toggleManualAutonomous; }
 int getTargetDriveLeft() { return targetDriveLeft; }
 int getTargetDriveRight() { return targetDriveRight; }
 int getTargetArm() { return targetArm; }

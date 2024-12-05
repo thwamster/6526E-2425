@@ -36,15 +36,19 @@ void runProgram3(void);
 void runProgram4(void);
 
 // Autonomous Helper Methods
-void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int t);
-void driveForTime(int r, int l, int t);
-void driveForDistance(int r, int l, int d);
-void intakeForTime(int i, int t);
-void driveAndIntakeForTime(int r, int l, int i, int s, int t);
-void scoreRing(void);
-void seizeGoal(void);
-void releaseGoal(void);
-void delayA(int n = 0);
+void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int milliseconds);
+void updateTargetsTo(vector<void (*)(int n)> targets, vector<int> values);
+void driveForTime(int right, int left, int milliseconds);
+void intakeForTime(int intake, int score, int milliseconds);
+void driveAndIntakeForTime(int right, int left, int intake, int score, int milliseconds);
+void scoreRing();
+void seizeGoal();
+void releaseGoal();
+void delayA(int milliseconds = 0);
+
+// Autonomous Parsing Methods
+int parseDistanceToTime(int speed, int centimeters);
+int parseAngleToTime(int speed, int degrees);
 
 /* Driver Controlled Period Task */
 void controlInputsDriver(void);
@@ -53,6 +57,9 @@ void controlInputsDriver(void);
 void updateInputsDriver(void);
 void updateToggles(void);
 void updateTogglePID(void);
+void updateToggleBrake(void);
+void updateToggleKillSwitch(void);
+void updateToggleTo(void (*set)(bool value), bool (*get)(void), int value, int *count);
 void updateTargets(void);
 void updateTargetDrivetrain(void);
 void updateTargetArm(void);
@@ -76,6 +83,7 @@ void updateRobotDrivetrain(void);
 void updateRobotArm(void);
 void updateRobotIntakeScore(void);
 void updateRobotClamp(void);
+void updateRobotBrakes(void);
 
 // Robot Helper Methods
 int PID(int target, int sensor, double kP, double kI, double kD, int* I, int limitI, int* lastError);
@@ -83,8 +91,10 @@ int PID(int target, int sensor, double kP, double kI, double kD, int* I, int lim
 /* Display Control System Task */
 void controlDisplay(void);
 void updateScreens(void);
-void updateScreenTo(lv_obj_t * screen);
+void updateScreenTo(lv_obj_t *screen);
 void updateGameInformation(void);
+void updateDropdowns(void);
+void updateDropdownOptionsTo(lv_obj_t **dropdown, string options);
 void updateImages(void);
 void updateImageTo(lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom, bool flipped);
 void updateCanvas(void);
@@ -117,17 +127,17 @@ void createTextStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColo
 void createButtonStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor);
 void createBoxStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor);
 void createTableStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor);
-void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int w, int h);
+void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int width, int height);
 void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom);
 void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style);
-void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int w, int h, bool header);
-void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int w, int h, void(*function)(lv_event_t *e));
+void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int width, int height, bool header);
+void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int width, int height, void(*function)(lv_event_t *event));
 void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y);
-void createTable(int screen, lv_obj_t **table, int x, int y, int r, int c);
-void createTableFormat(lv_event_t *e);
+void createTable(int screen, lv_obj_t **table, int x, int y, int rows, int columns);
 
 // Display Event Methods
-void eventAutonomousManual(lv_event_t *e);
+void eventTableFormat(lv_event_t *event);
+void eventAutonomousManual(lv_event_t *event);
 
 // Display Parsing Methods
 string parseCurrentMode(void);
@@ -141,13 +151,16 @@ string parseCurrentScreen(void);
 lv_obj_t* getScreenAt(int n);
 
 /* Set Methods */
+void setTogglePID(bool b);
+void setToggleBrake(bool b);
+void setToggleKillSwitch(bool b);
+void setToggleManualAutonomous(bool b);
 void setTargetDriveLeft(int n);
 void setTargetDriveRight(int n);
 void setTargetArm(int n);
 void setTargetIntake(int n);
 void setTargetScore(int n);
 void setTargetClamp(int n);
-void setTogglePID(bool b);
 void setActualDriveLeft(int n);
 void setActualDriveRight(int n);
 void setCurrentState(bool b);
@@ -159,6 +172,10 @@ void setCurrentAutonomous(int n);
 void setCurrentScreen(int n);
 
 /* Get Methods */
+bool getTogglePID(void);
+bool getToggleBrake(void);
+bool getToggleKillSwitch(void);
+bool getToggleManualAutonomous(void);
 int getTargetDriveLeft(void);
 int getTargetDriveRight(void);
 int getTargetArm(void);
@@ -167,7 +184,6 @@ int getTargetScore(void);
 int getTargetClamp(void);
 int getActualDriveLeft(void);
 int getActualDriveRight(void);
-bool getTogglePID(void);
 bool getCurrentState(void);
 int getCurrentMode(void);
 int getCurrentPeriod(void);
@@ -226,6 +242,12 @@ struct {
     int velocityR{0};
 } inputsRobot;
 
+// Toggle Variables
+bool togglePID{false};
+bool toggleBrake{false};
+bool toggleKillSwitch{false};
+bool toggleManualAutonomous{false};
+
 // Target Variables
 int targetDriveLeft{0};
 int targetDriveRight{0};
@@ -237,9 +259,6 @@ int targetClamp{0};
 // Actual Variables
 int actualDriveLeft{0};
 int actualDriveRight{0};
-
-// Toggles
-bool togglePID{false};
 
 /* Graphical Objects */
 // Constants
@@ -306,7 +325,6 @@ lv_obj_t *dropdownHeader;
 // Main Menu Screen
 lv_obj_t *buttonMainInfo;
 lv_obj_t *textMainInfo;
-lv_obj_t *imgMainLayout;
 
 // Autonomous Screen
 lv_obj_t *dropdownAutonomousMode;
@@ -315,6 +333,7 @@ lv_obj_t *dropdownAutonomousPosition;
 lv_obj_t *dropdownAutonomousAutonomous;
 lv_obj_t *buttonAutonomousManual;
 lv_obj_t *textAutonomousManual;
+lv_obj_t *imgAutonomousLayout;
 
 // Electronics Screen
 lv_obj_t *tableElectronicsMotors;
