@@ -80,71 +80,84 @@ void runAutonomous() {
 
 	// Select autonomous program
 	switch (getCurrentAutonomous()) {
-
-		case 0:  // Do nothing
-			delayA();
-			break;
-
-		case 1: // Program #1
+		
+		case 1: // Program #1: Drive Backward
 			runProgram1();
 			break;
 		
-		case 2: // Program #2
+		case 2: // Program #2: 2-Ring Score
 			runProgram2();
 			break;
 		
-		case 3: // Program #3
+		case 3: // Program #3: [n/a]
 			runProgram3();
 			break;
 
-		case 4: // Program #4
+		case 4: // Program #4: Testing
 			runProgram4();
 			break;
-		
+
+		default: // Do Nothing
+			delayA();
+			break;
 	}
 }
 
 void runProgram1() {
 
-	// 1 ring on Mobile Goal + Off starting line + Ladder contact
-	delayA(1000);
-	driveForTime(-127, -127, 320); // Drive forward
-	delayA(1000);
-	seizeGoal(); // Clamp onto Mobile Goal
-	delayA(1000);
-	scoreRing(); // Score pre-loaded ring
-	delayA(1000);
-	driveForTime(-80, -80, 1000); // Drive forward into tower
-	delayA(1000);
-	driveForTime(-20, -20, 2000); // Drive slowly into the tower to ensure connection
-	delayA(3000);
+	// Off starting line
+	delayA();
+	releaseGoal();
+	delayA(500);
+	driveForTime(-100, -100, parseDistanceToTime(100, 10)); // Drive backward 10 centimeters
+	delayA();
 }
 
 void runProgram2() {
 
-	// Drive backwards, clamp goal, and score preload
-    driveForTime(-127, -127, 320);
+	// Off starting line + 2 rings on Mobile Goal
+	delayA();
+	releaseGoal(); // Ensure clamp is open
+	delayA(500);
+	driveForTime(-100, -100, parseDistanceToTime(100, 40)); // Drive backward 40 centimeters
+	delayA(500);
+	seizeGoal(); // Clamp onto Mobile Goal
+	delayA(500);
+	scoreRing(); // Score pre-loaded ring
+	delayA(1000);
+	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, 75)); // Turn 75 degrees depending on corner
+	delayA(500);
+	driveAndIntakeForTime(100, 100, 90, 80, parseDistanceToTime(100, 50)); // Drive forward 50 centimeters while intaking
+	delayA();
+	scoreRing(); // Score bottom ring
+	delayA();
+}
+
+void runProgram3() {
+
+	// Unimplemented
+	delayA();
+}
+
+void runProgram4() {
+
+	// Testing
+	delayA();
+    driveForTime(-127, -127, 320); 	// Drive backwards, clamp goal, and score preload
     delayA(400);
     seizeGoal();
     delayA(320);
     scoreRing();
-
-    // Turn right towards north stack and score bottom ring
-    driveForTime(127, -127, 300);
+	delayA();
+    driveForTime(127, -127, 300); // Turn right towards north stack and score bottom ring
     delayA(320);
     driveAndIntakeForTime(127, 127, 90, 80, 900);
     delayA(200);
-
-    // Turn, drive to the corner pile, and score the bottom ring
-    driveForTime(127, -127, 120);
+    driveForTime(127, -127, 120); // Turn, drive to the corner pile, and score the bottom ring
     delayA(200);
     driveAndIntakeForTime(127, 127, 90, 80, 1250);
     delayA(300);
 }
-
-void runProgram3() {}
-
-void runProgram4() {}
 
 // Autonomous Helper Methods
 void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int milliseconds) {
@@ -169,8 +182,17 @@ void releaseGoal() { setTargetClamp(0); }
 void delayA(int milliseconds) { (milliseconds < autonDelay) ? delay(autonDelay) : delay(milliseconds); }
 
 // Autonomous Parsing Methods
-int parseDistanceToTime(int speed, int centimeters) { return 10 * centimeters + 60; }
-int parseAngleToTime(int speed, int degrees) { return 1 * degrees + 0; }
+int parseDistanceToTime(int speed, int centimeters) { return (10 * centimeters + 60) / (abs(speed) * 0.01); }
+int parseAngleToTime(int speed, int degrees) { return (4 * degrees + 40) / (abs(speed) * 0.01); }
+
+// Autonomous Corner Methods
+int getCurrentCorner() { return getCurrentSide() == 1 ? (getCurrentPosition() == 1 ? 1 : 2) : (getCurrentPosition() == 1 ? 3 : 4); }
+bool isRedCorner() { return getCurrentSide() == 1; }
+bool isBlueCorner() { return getCurrentSide() == 2; }
+bool isPositiveCorner() { return getCurrentPosition() == 1; }
+bool isNegativeCorner() { return getCurrentPosition() == 2; }
+bool isRightCorner() { return getCurrentCorner() % 2 == 0; }
+bool isLeftCorner() {return getCurrentCorner() % 2 != 0; }
 
 /* Driver Controlled Period Task */
 void controlInputsDriver() {
@@ -231,21 +253,22 @@ void updateToggles() {
 }
 
 void updateTogglePID() {
-
 	static int aDelayCount{0};
 	updateToggleTo(&setTogglePID, &getTogglePID, inputsDriver.buttonA, &aDelayCount);
 }
 
 void updateToggleBrake() {
-
 	static int bDelayCount{0};
 	updateToggleTo(&setToggleBrake, &getToggleBrake, inputsDriver.buttonB, &bDelayCount);
 }
 
 void updateToggleKillSwitch() {
-	
-	static int xDelayCount{0};
-	updateToggleTo(&setToggleKillSwitch, &getToggleKillSwitch, inputsDriver.buttonX, &xDelayCount);
+	if (inputsDriver.buttonX == 1) {
+		setToggleKillSwitch(true);
+	}
+	else {
+		setToggleKillSwitch(false);
+	}
 }
 
 void updateToggleTo(void (*set)(bool value), bool (*get)(void), int value, int *count) {
@@ -409,15 +432,6 @@ void updateRobotClamp() {
 }
 
 void updateRobotBrakes() {
-	if (!getToggleBrake() && !getToggleManualAutonomous()) {
-		motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_COAST);
-		motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_COAST);
-	}
-	else {
-		motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_HOLD);
-		motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_HOLD);
-	}
-	
 	motorsArm.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 	motorIntake.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 	motorScore.set_brake_mode_all(MOTOR_BRAKE_HOLD); 
@@ -634,7 +648,7 @@ void updateTextTableTo(lv_obj_t **table, vector<int> widths, vector<vector<strin
 }
 
 void updateController() {
-	masterController.print(0, 0, ("6526-E: " + parseCurrentSide()).c_str());
+	masterController.print(0, 0, (to_string(getMaxTemp()) + "°C").c_str()); 
 }
 
 // Display Initializaiton Methods
@@ -931,6 +945,11 @@ void eventTableFormat(lv_event_t *event) {
 
 void eventAutonomousManual(lv_event_t *event) {
 
+	// Update brakes
+	delayA();
+	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+
 	// Manually triggers the autonomous program
 	delayA();
 	setToggleManualAutonomous(true);
@@ -939,6 +958,11 @@ void eventAutonomousManual(lv_event_t *event) {
 	delayA(500);
 	setToggleManualAutonomous(false);
 	delayA();
+
+	// Update brakes
+	delayA();
+	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_COAST);
+	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_COAST);
 }
 
 // Display Parsing Methods
@@ -978,10 +1002,10 @@ string parseCurrentPosition() {
 
 string parseCurrentAutonomous() {
 	switch (getCurrentAutonomous()) {
-		case 1: return "Program #1: Preload Score";
-		case 2: return "Program #2";
-		case 3: return "Program #3";
-		case 4: return "Program #4";
+		case 1: return "Program #1: Drive Backward";
+		case 2: return "Program #2: 2-Ring Score";
+		case 3: return "Program #3: [n/a]";
+		case 4: return "Program #4: Testing";
 		default: return "Unknown";
 	}
 }
@@ -997,6 +1021,19 @@ string parseCurrentScreen() {
 }
 
 // Display Helper Methods
+int getMaxTemp() {
+	return max({
+		motorsDriveLeft.get_temperature(0),
+		motorsDriveLeft.get_temperature(1), 
+		motorsDriveRight.get_temperature(0), 
+		motorsDriveRight.get_temperature(1),
+		motorsArm.get_temperature(0),
+		motorsArm.get_temperature(1),
+		motorScore.get_temperature(0), 
+		motorIntake.get_temperature(0)
+		});
+}
+
 lv_obj_t* getScreenAt(int screen) {
 	switch (screen) {
 		case -1:

@@ -50,6 +50,15 @@ void delayA(int milliseconds = 0);
 int parseDistanceToTime(int speed, int centimeters);
 int parseAngleToTime(int speed, int degrees);
 
+// Autonomous Corner Methods
+int getCurrentCorner();
+bool isRedCorner();
+bool isBlueCorner();
+bool isPositiveCorner();
+bool isNegativeCorner();
+bool isRightCorner();
+bool isLeftCorner();
+
 /* Driver Controlled Period Task */
 void controlInputsDriver(void);
 
@@ -148,6 +157,8 @@ string parseCurrentAutonomous(void);
 string parseCurrentScreen(void);
 
 // Display Helper Methods
+int getCurrentCorner();
+int getMaxTemp();
 lv_obj_t* getScreenAt(int n);
 
 /* Set Methods */
