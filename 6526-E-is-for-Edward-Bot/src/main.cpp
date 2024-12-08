@@ -104,7 +104,35 @@ void runAutonomous() {
 }
 
 void runProgram1() {
+	//BLUE SIDE TEST ONLY
+	
+	//drive backwards onto the goal spot, clamp goal, and score ring
+	delayA();
+	driveForTime(-127,-127,600);
+	delayA();
+	seizeGoal();
+	delayA();
+	scoreRing();
+	delayA();
 
+	//turn to face the 2 stack to the right, run onto it, and score ring
+	driveForTime(-127,127,405);
+	delayA();
+	driveAndIntakeForTime(127,127,90,127,500);
+	delayA();
+	intakeForTime(90, 127, 3000);	
+	delayA();
+
+	//turn left, drive into a line stack, and score the ring
+	driveForTime(127,-127,405);
+	delayA();
+	driveAndIntakeForTime(80,80,90,127,200); //make this more precise
+	delayA();
+	intakeForTime(90, 127, 3000);
+	delayA();
+}
+
+void runProgram2() {
 	// Off starting line
 	delayA();
 	releaseGoal();
@@ -113,8 +141,8 @@ void runProgram1() {
 	delayA();
 }
 
-void runProgram2() {
-
+void runProgram3() {
+	//Teddy auton
 	// Off starting line + 2 rings on Mobile Goal
 	delayA();
 	releaseGoal(); // Ensure clamp is open
@@ -133,30 +161,44 @@ void runProgram2() {
 	delayA();
 }
 
-void runProgram3() {
-
-	// Unimplemented
-	delayA();
-}
-
 void runProgram4() {
+	//TEST BEFORE USE
 
-	// Testing
+	//drive backwards onto the goal spot, clamp goal, and score ring
 	delayA();
-    driveForTime(-127, -127, 320); 	// Drive backwards, clamp goal, and score preload
-    delayA(400);
-    seizeGoal();
-    delayA(320);
-    scoreRing();
+	driveForTime(-127,-127,600);
 	delayA();
-    driveForTime(127, -127, 300); // Turn right towards north stack and score bottom ring
-    delayA(320);
-    driveAndIntakeForTime(127, 127, 90, 80, 900);
-    delayA(200);
-    driveForTime(127, -127, 120); // Turn, drive to the corner pile, and score the bottom ring
-    delayA(200);
-    driveAndIntakeForTime(127, 127, 90, 80, 1250);
-    delayA(300);
+	seizeGoal();
+	delayA();
+	scoreRing();
+	delayA();
+
+	//turn to face the 2 stack to the right, run onto it, and score ring
+	
+	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, 100));
+	delayA();
+	driveAndIntakeForTime(127,127,90,127,500);
+	delayA();
+	intakeForTime(90, 127, 3000);	
+	delayA();
+
+	//turn left, drive into a line stack, and score the ring
+	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, -90));
+	delayA();
+	driveAndIntakeForTime(80,80,90,127,200); //make this more precise
+	delayA();
+	intakeForTime(90, 127, 3000);
+	delayA();
+
+	//drive back and touch ladder
+	driveForTime(-127,-127,300);
+	delayA();
+	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, -50));
+	delayA();
+	motorsArm.move(127);
+	delayA();
+	driveForTime(127,127,420);
+	delayA();
 }
 
 // Autonomous Helper Methods
