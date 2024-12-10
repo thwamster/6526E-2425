@@ -38,10 +38,13 @@ void runProgram4(void);
 // Autonomous Helper Methods
 void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int milliseconds);
 void updateTargetsTo(vector<void (*)(int n)> targets, vector<int> values);
-void driveForTime(int right, int left, int milliseconds);
-void intakeForTime(int intake, int score, int milliseconds);
-void driveAndIntakeForTime(int right, int left, int intake, int score, int milliseconds);
-void scoreRing();
+void driveForTime(int left, int right, int milliseconds);
+void scoreRingForTime(int milliseconds);
+void driveAndScoreRingForTime(int left, int right, int milliseconds);
+void turnLeftForTime(int milliseconds);
+void turnRightForTime(int milliseconds);
+void turnLeftAndScoreForTime(int milliseconds);
+void turnRightAndScoreForTime(int milliseconds);
 void seizeGoal();
 void releaseGoal();
 void delayA(int milliseconds = 0);
@@ -74,6 +77,7 @@ void updateTargetDrivetrain(void);
 void updateTargetArm(void);
 void updateTargetIntakeScore(void);
 void updateTargetClamp(void);
+void updateTargetPaddle(void);
 
 /* Universal Period Task */
 void controlInputsRobot(void);
@@ -92,6 +96,7 @@ void updateRobotDrivetrain(void);
 void updateRobotArm(void);
 void updateRobotIntakeScore(void);
 void updateRobotClamp(void);
+void updateRobotPaddle(void);
 void updateRobotBrakes(void);
 
 // Robot Helper Methods
@@ -172,6 +177,7 @@ void setTargetArm(int n);
 void setTargetIntake(int n);
 void setTargetScore(int n);
 void setTargetClamp(int n);
+void setTargetPaddle(int n);
 void setActualDriveLeft(int n);
 void setActualDriveRight(int n);
 void setCurrentState(bool b);
@@ -193,6 +199,7 @@ int getTargetArm(void);
 int getTargetIntake(void);
 int getTargetScore(void);
 int getTargetClamp(void);
+int getTargetPaddle(void);
 int getActualDriveLeft(void);
 int getActualDriveRight(void);
 bool getCurrentState(void);
@@ -205,10 +212,13 @@ int getCurrentScreen(void);
 
 /* Global Objects */
 // Constants
-const int waitInterval{12};
-const int maxInterval{100};
-const int doubleInputDelay{150};
-const int autonDelay{300};
+const int intervalWait{12};
+const int intervalMax{100};
+const int delayDoubleInput{150};
+const int delayAuton{200};
+const int speedIntake{127};
+const int speedScore{127};
+const int speedMax{127};
 
 // Tasks
 Mutex mutex;
@@ -227,7 +237,8 @@ MotorGroup motorsDriveRight({1, 2});
 MotorGroup motorsArm({3, -4});
 MotorGroup motorIntake({7});
 MotorGroup motorScore({8}); 
-Pneumatics pneumaticClamp(8, true);
+Pneumatics pneumaticClamp(8, false);
+Pneumatics pneumaticPaddle(7, false);
 
 // Inputs
 struct {
@@ -266,6 +277,7 @@ int targetArm{0};
 int targetIntake{0};
 int targetScore{0};
 int targetClamp{0};
+int targetPaddle{0};
 
 // Actual Variables
 int actualDriveLeft{0};

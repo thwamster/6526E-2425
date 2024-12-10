@@ -29,7 +29,7 @@ void autonomous() {
 	// Control loop
 	while (true) {
 		
-		delay(waitInterval); // Wait
+		delay(intervalWait); // Wait
 	}
 }
 
@@ -45,7 +45,7 @@ void opcontrol() {
 	// Control loop
 	while (true) {
 		
-		delay(waitInterval); // Wait
+		delay(intervalWait); // Wait
 	}
 }
 
@@ -62,21 +62,25 @@ void controlInputsAutonomous() {
 	while (true) {
 		
 		// Autonomous loop, runs only once
-		if (getCurrentAutonomous()) {
+		if (b) {
 			
 			// Select correct autonomous program
 			runAutonomous();
 			b = false;
 		}
 
-		delay(waitInterval); // Waits
+		delay(intervalWait); // Waits
 	}
 }
 
 // Autonomous Programs
 void runAutonomous() {
 
-	setToggleBrake(true); // Updates brakes
+	// Updates brakes
+	setToggleBrake(true);
+	delayA();
+	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_HOLD);
+	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 
 	// Select autonomous program
 	switch (getCurrentAutonomous()) {
@@ -101,105 +105,67 @@ void runAutonomous() {
 			delayA();
 			break;
 	}
+
+	// Update brakes
+	delayA();
+	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_COAST);
+	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_COAST);
 }
 
 void runProgram1() {
-	//BLUE SIDE TEST ONLY
-	
-	//drive backwards onto the goal spot, clamp goal, and score ring
-	delayA();
-	driveForTime(-127,-127,600);
-	delayA();
-	seizeGoal();
-	delayA();
-	scoreRing();
-	delayA();
 
-	//turn to face the 2 stack to the right, run onto it, and score ring
-	driveForTime(-127,127,405);
-	delayA();
-	driveAndIntakeForTime(127,127,90,127,500);
-	delayA();
-	intakeForTime(90, 127, 3000);	
-	delayA();
-
-	//turn left, drive into a line stack, and score the ring
-	driveForTime(127,-127,405);
-	delayA();
-	driveAndIntakeForTime(80,80,90,127,200); //make this more precise
-	delayA();
-	intakeForTime(90, 127, 3000);
-	delayA();
-}
-
-void runProgram2() {
-	// Off starting line
-	delayA();
+	// Drive backwards, clamp goal, raise arm, and score the preload
 	releaseGoal();
-	delayA(500);
-	driveForTime(-100, -100, parseDistanceToTime(100, 10)); // Drive backward 10 centimeters
-	delayA();
-}
-
-void runProgram3() {
-	//Teddy auton
-	// Off starting line + 2 rings on Mobile Goal
-	delayA();
-	releaseGoal(); // Ensure clamp is open
-	delayA(500);
-	driveForTime(-100, -100, parseDistanceToTime(100, 40)); // Drive backward 40 centimeters
-	delayA(500);
-	seizeGoal(); // Clamp onto Mobile Goal
-	delayA(500);
-	scoreRing(); // Score pre-loaded ring
-	delayA(1000);
-	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, 75)); // Turn 75 degrees depending on corner
-	delayA(500);
-	driveAndIntakeForTime(100, 100, 90, 80, parseDistanceToTime(100, 50)); // Drive forward 50 centimeters while intaking
-	delayA();
-	scoreRing(); // Score bottom ring
-	delayA();
-}
-
-void runProgram4() {
-	//TEST BEFORE USE
-
-	//drive backwards onto the goal spot, clamp goal, and score ring
-	delayA();
-	driveForTime(-127,-127,600);
-	delayA();
+	driveForTime(-speedMax, -speedMax, 600);
+	delayA(300);
 	seizeGoal();
 	delayA();
-	scoreRing();
+	scoreRingForTime(1000);
+	moveForTime({setTargetArm, setTargetIntake, setTargetScore}, {speedMax, speedIntake, speedScore}, 200);
 	delayA();
 
-	//turn to face the 2 stack to the right, run onto it, and score ring
+	// Turn to face the stack, drive forwards, and score the bottom ring
+	isLeftCorner() ? turnLeftAndScoreForTime(400) : turnRightAndScoreForTime(400); // Corner dependent
+	delayA();
+	driveAndScoreRingForTime(speedMax, speedMax, 500);
+	scoreRingForTime(500);
+	delayA();
+
+	// Corner dependent	
+	if (isNegativeCorner()) {
+
+		// Turn to face the stack, drive fowards, and score the bottom left ring
+		isLeftCorner() ? turnLeftAndScoreForTime(400) : turnRightAndScoreForTime(400); // Corner dependent
+		delayA();
+		driveAndScoreRingForTime(80, 80, 325);
+		scoreRingForTime(1500);
+		delayA();
+
+		// Turn towards the ladder
+		isLeftCorner() ? turnLeftAndScoreForTime(400) : turnRightAndScoreForTime(400); // Corner dependent
+		scoreRingForTime(500);
+		delayA();
+	}
+	else {
+
+		// Turn towards the ladder
+		isLeftCorner() ? turnLeftAndScoreForTime(400) : turnRightAndScoreForTime(550);
+		delayA();
+	}
+
 	
-	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, 100));
+	// Drive forwards, drive forwards slowly
+	driveAndScoreRingForTime(speedMax, speedMax, 800);
 	delayA();
-	driveAndIntakeForTime(127,127,90,127,500);
-	delayA();
-	intakeForTime(90, 127, 3000);	
-	delayA();
-
-	//turn left, drive into a line stack, and score the ring
-	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, -90));
-	delayA();
-	driveAndIntakeForTime(80,80,90,127,200); //make this more precise
-	delayA();
-	intakeForTime(90, 127, 3000);
-	delayA();
-
-	//drive back and touch ladder
-	driveForTime(-127,-127,300);
-	delayA();
-	driveForTime((isRightCorner() ? -100 : 100), (isRightCorner() ? 100 : -100), parseAngleToTime(100, -50));
-	delayA();
-	motorsArm.move(127);
-	delayA();
-	driveForTime(127,127,420);
+	driveAndScoreRingForTime(50, 50, 800);
 	delayA();
 }
+
+void runProgram2() { delayA(); }
+
+void runProgram3() { delayA(); }
+
+void runProgram4() { delayA(); }
 
 // Autonomous Helper Methods
 void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int milliseconds) {
@@ -215,13 +181,16 @@ void updateTargetsTo(vector<void (*)(int n)> targets, vector<int> values) {
 	}
 }
 
-void driveForTime(int right, int left, int milliseconds) { moveForTime({&setTargetDriveLeft, &setTargetDriveRight}, {right, left}, milliseconds); }
-void intakeForTime(int intake, int score, int milliseconds) { moveForTime({&setTargetIntake, &setTargetScore}, {intake, score}, milliseconds); }
-void driveAndIntakeForTime(int right, int left, int intake, int score, int milliseconds) { moveForTime({&setTargetDriveRight, &setTargetDriveLeft, &setTargetIntake, &setTargetScore}, {right, left, intake, score}, milliseconds); }
-void scoreRing() { intakeForTime(90, 80, 2500); }
+void driveForTime(int left, int right, int milliseconds) { moveForTime({&setTargetDriveLeft, &setTargetDriveRight}, {left, right}, milliseconds); }
+void scoreRingForTime(int milliseconds) { moveForTime({&setTargetIntake, &setTargetScore}, {speedIntake, speedScore}, milliseconds); }
+void driveAndScoreRingForTime(int left, int right, int milliseconds) { moveForTime({&setTargetDriveLeft, &setTargetDriveRight, &setTargetIntake, &setTargetScore}, {right, left, speedIntake, speedScore}, milliseconds); }
+void turnLeftForTime(int milliseconds) { driveForTime(-speedMax, speedMax, milliseconds); }
+void turnRightForTime(int milliseconds) { driveForTime(speedMax, -speedMax, milliseconds); }
+void turnLeftAndScoreForTime(int milliseconds) { driveAndScoreRingForTime(-speedMax, speedMax, milliseconds); }
+void turnRightAndScoreForTime(int milliseconds) { driveAndScoreRingForTime(speedMax, -speedMax, milliseconds); }
 void seizeGoal() { setTargetClamp(1); }
 void releaseGoal() { setTargetClamp(0); }
-void delayA(int milliseconds) { (milliseconds < autonDelay) ? delay(autonDelay) : delay(milliseconds); }
+void delayA(int milliseconds) { (milliseconds < delayAuton) ? delay(delayAuton) : delay(milliseconds); }
 
 // Autonomous Parsing Methods
 int parseDistanceToTime(int speed, int centimeters) { return (10 * centimeters + 60) / (abs(speed) * 0.01); }
@@ -247,7 +216,7 @@ void controlInputsDriver() {
 		// Update stored inputs from driver's controller
 		updateInputsDriver();
 
-		mutex.take(maxInterval); // Begin Exclusivity
+		mutex.take(intervalMax); // Begin Exclusivity
 
 		// Checks if the targets should be updated
 		if (!getToggleManualAutonomous()) {
@@ -260,7 +229,7 @@ void controlInputsDriver() {
 
 		mutex.give(); // End Exclusivity
 
-		delay(waitInterval); // Wait
+		delay(intervalWait); // Wait
 	}
 }
 
@@ -316,7 +285,7 @@ void updateToggleKillSwitch() {
 void updateToggleTo(void (*set)(bool value), bool (*get)(void), int value, int *count) {
 
 	// Checks if button is pressed, and hasn't been pressed for a delay
-	if (value == 1 && *count >= doubleInputDelay) {
+	if (value == 1 && *count >= delayDoubleInput) {
 
 		// Flips the toggle
 		set(!get());
@@ -334,6 +303,7 @@ void updateTargets() {
 	updateTargetArm();
 	updateTargetIntakeScore();
 	updateTargetClamp();
+	updateTargetPaddle();
 }
 
 void updateTargetDrivetrain() {
@@ -379,6 +349,15 @@ void updateTargetClamp() {
 	}
 }
 
+void updateTargetPaddle() {
+	if (inputsDriver.buttonLeft == 1 && inputsDriver.buttonRight == 0) {
+		setTargetPaddle(1);
+	}
+	else if (inputsDriver.buttonLeft == 0 && inputsDriver.buttonRight == 1){
+		setTargetPaddle(0);
+	}
+}
+
 /* Universal Period Task */
 void controlInputsRobot() {
 
@@ -387,13 +366,13 @@ void controlInputsRobot() {
 
 		updateInputsRobot();
 
-		mutex.take(maxInterval); // Begin Exclusivity
+		mutex.take(intervalMax); // Begin Exclusivity
 
 		updateActuals();
 
 		mutex.give(); // End Exclusivity
 
-		delay(waitInterval); // Wait
+		delay(intervalWait); // Wait
 	}
 }
 
@@ -418,7 +397,7 @@ void controlRobot() {
 	// Control loop
 	while (true) {
 
-		mutex.take(maxInterval); // Begin Exclusivity
+		mutex.take(intervalMax); // Begin Exclusivity
 
 		if (!getToggleKillSwitch()) {
 			updateRobot();
@@ -426,7 +405,7 @@ void controlRobot() {
 
 		mutex.give(); // End Exclusivity
 
-		delay(waitInterval); // Wait
+		delay(intervalWait); // Wait
 	}
 }
 
@@ -436,6 +415,7 @@ void updateRobot() {
 	updateRobotArm();
 	updateRobotIntakeScore();
 	updateRobotClamp();
+	updateRobotPaddle();
 	updateRobotBrakes();
 }
 
@@ -470,6 +450,15 @@ void updateRobotClamp() {
 	}
 	else {
 		pneumaticClamp.retract();
+	}
+}
+
+void updateRobotPaddle() {
+	if (getTargetPaddle() == 1) {
+		pneumaticPaddle.extend();
+	}
+	else {
+		pneumaticPaddle.retract();
 	}
 }
 
@@ -566,10 +555,10 @@ void updateImages() {
 		case 1:
 			switch (getCurrentSide()) {
 				case 1:
-					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, true);
+					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, false);
 					break;
 				case 2:
-					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, false);
+					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, true);
 					break;
 			}
 			break;
@@ -701,6 +690,8 @@ void initializeAllGraphics() {
 	initializeStyles();
 	initializeAllScreens();
 	initializeText();
+
+	lv_dropdown_set_selected(dropdownHeader, 1);
 }
 
 void initializeColors() {
@@ -987,11 +978,6 @@ void eventTableFormat(lv_event_t *event) {
 
 void eventAutonomousManual(lv_event_t *event) {
 
-	// Update brakes
-	delayA();
-	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_HOLD);
-	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_HOLD);
-
 	// Manually triggers the autonomous program
 	delayA();
 	setToggleManualAutonomous(true);
@@ -1000,11 +986,6 @@ void eventAutonomousManual(lv_event_t *event) {
 	delayA(500);
 	setToggleManualAutonomous(false);
 	delayA();
-
-	// Update brakes
-	delayA();
-	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_COAST);
-	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_COAST);
 }
 
 // Display Parsing Methods
@@ -1105,6 +1086,7 @@ void setTargetArm(int n) { targetArm = n; }
 void setTargetIntake(int n) { targetIntake = n; }
 void setTargetScore(int n) { targetScore = n; }
 void setTargetClamp(int n) { targetClamp = n; }
+void setTargetPaddle(int n) { targetPaddle = n; }
 void setActualDriveLeft(int n) { actualDriveLeft = n; }
 void setActualDriveRight(int n) { actualDriveRight = n; }
 void setCurrentState(bool b) { currentState = b; }
@@ -1126,6 +1108,7 @@ int getTargetArm() { return targetArm; }
 int getTargetIntake() { return targetIntake; }
 int getTargetScore() { return targetScore; }
 int getTargetClamp() { return targetClamp; }
+int getTargetPaddle() { return targetPaddle; }
 int getActualDriveLeft() { return actualDriveLeft; }
 int getActualDriveRight() { return actualDriveRight; }
 bool getCurrentState() { return currentState; }
