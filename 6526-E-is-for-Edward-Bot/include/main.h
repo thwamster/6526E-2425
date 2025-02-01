@@ -5,8 +5,8 @@
 #define PROS_USE_LITERALS
 
 #include "api.h"
-#include "pros/apix.h"
 #include "liblvgl/lvgl.h"
+#include "pros/apix.h"
 
 using namespace std;
 using namespace pros;
@@ -34,6 +34,10 @@ void runProgram1(void);
 void runProgram2(void);
 void runProgram3(void);
 void runProgram4(void);
+void programPreloadScore(void);
+void programStackScore(void);
+void programLadder(void);
+void programLadderBackwards(void);
 
 // Autonomous Helper Methods
 void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int milliseconds);
@@ -100,7 +104,7 @@ void updateRobotPaddle(void);
 void updateRobotBrakes(void);
 
 // Robot Helper Methods
-int PID(int target, int sensor, double kP, double kI, double kD, int* I, int limitI, int* lastError);
+int PID(int target, int sensor, double kP, double kI, double kD, int *I, int limitI, int *lastError);
 
 /* Display Control System Task */
 void controlDisplay(void);
@@ -117,7 +121,7 @@ void updateTextLabelTo(lv_obj_t **label, string text);
 void updateTextTableTo(lv_obj_t **table, vector<int> widths, vector<vector<string>> text);
 void updateController(void);
 
-// Display Initializaiton Methods
+// Display Initialization Methods
 void initializeAllGraphics(void);
 void initializeColors(void);
 void initializeFonts(void);
@@ -145,7 +149,7 @@ void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int width, int he
 void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom);
 void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style);
 void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int y, int width, int height, bool header);
-void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int width, int height, void(*function)(lv_event_t *event));
+void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int width, int height, void (*function)(lv_event_t *event));
 void createBox(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y);
 void createTable(int screen, lv_obj_t **table, int x, int y, int rows, int columns);
 
@@ -164,7 +168,7 @@ string parseCurrentScreen(void);
 // Display Helper Methods
 int getCurrentCorner();
 int getMaxTemp();
-lv_obj_t* getScreenAt(int n);
+lv_obj_t *getScreenAt(int n);
 
 /* Set Methods */
 void setTogglePID(bool b);
@@ -211,14 +215,19 @@ int getCurrentAutonomous(void);
 int getCurrentScreen(void);
 
 /* Global Objects */
-// Constants
+// Time Constants
 const int intervalWait{12};
 const int intervalMax{100};
 const int delayDoubleInput{150};
-const int delayAuton{200};
+const int delayAutonomous{200};
+
+// Speed Constants
 const int speedIntake{127};
 const int speedScore{127};
 const int speedMax{127};
+
+// Autonomous Constants
+const vector<void (*)()> autonomousPrograms = {runProgram1, runProgram2, runProgram3, runProgram4};
 
 // Tasks
 Mutex mutex;
@@ -236,7 +245,7 @@ MotorGroup motorsDriveLeft({-9, -10});
 MotorGroup motorsDriveRight({1, 2});
 MotorGroup motorsArm({3, -4});
 MotorGroup motorIntake({7});
-MotorGroup motorScore({8}); 
+MotorGroup motorScore({8});
 Pneumatics pneumaticClamp(8, false);
 Pneumatics pneumaticPaddle(7, false);
 
@@ -260,8 +269,8 @@ struct {
 	int buttonL2{0};
 } inputsDriver;
 struct {
-    int velocityL{0};
-    int velocityR{0};
+	int velocityL{0};
+	int velocityR{0};
 } inputsRobot;
 
 // Toggle Variables

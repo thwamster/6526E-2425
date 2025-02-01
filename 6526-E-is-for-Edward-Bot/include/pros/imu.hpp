@@ -58,7 +58,7 @@ class Imu : public Device {
 	 * ///@{
 	 */
 
-	public:
+  public:
 	/**
 	 * Creates an Imu object for the given port
 	 *
@@ -83,10 +83,9 @@ class Imu : public Device {
 	 * \endcode
 	 */
 
-
 	Imu(const std::uint8_t port) : Device(port, DeviceType::imu){};
 
-	Imu(const Device& device) : Imu(device.get_port()){};
+	Imu(const Device &device) : Imu(device.get_port()){};
 
 	/**
 	 * Gets a IMU sensor that is plugged in to the brain
@@ -190,18 +189,17 @@ class Imu : public Device {
 	 */
 	virtual std::int32_t set_data_rate(std::uint32_t rate) const;
 
-
 	/**
 	 * Gets all IMU sensors.
-	 * 
+	 *
 	 * \return A vector of Imu sensor objects.
 	 *
 	 * \b Example
- 	 * \code
+	 * \code
 	 * void opcontrol() {
 	 *   std::vector<Imu> imu_all = pros::Imu::get_all_devices();  // All IMU sensors that are connected
 	 * }
- 	 * \endcode
+	 * \endcode
 	 */
 
 	static std::vector<Imu> get_all_devices();
@@ -1048,7 +1046,7 @@ class Imu : public Device {
 	 * pitch: (pitch angle), roll: (roll angle), yaw: (yaw angle),
 	 * gyro rate: {x,y,z}, get accel: {x,y,z}, calibrating: (calibrating boolean)]
 	 */
-	friend std::ostream& operator<<(std::ostream& os, const pros::Imu& imu);
+	friend std::ostream &operator<<(std::ostream &os, const pros::Imu &imu);
 
 	///@}
 };
@@ -1068,10 +1066,10 @@ namespace literals {
  * \endcode
  */
 const pros::Imu operator"" _imu(const unsigned long long int i);
-}  // namespace literals
+} // namespace literals
 
 using IMU = Imu;
-}  // namespace v5
-}  // namespace pros
+} // namespace v5
+} // namespace pros
 
 #endif

@@ -18,7 +18,7 @@ void initialize() {
 }
 
 void autonomous() {
-	
+
 	// Update tasks
 	periodAutonomous.resume();
 	periodDriverControlled.suspend();
@@ -28,7 +28,6 @@ void autonomous() {
 
 	// Control loop
 	while (true) {
-		
 		delay(intervalWait); // Wait
 	}
 }
@@ -44,13 +43,13 @@ void opcontrol() {
 
 	// Control loop
 	while (true) {
-		
+
 		delay(intervalWait); // Wait
 	}
 }
 
 // Unused Competition Methods
-void disabled() {}	
+void disabled() {}
 
 void competition_initialize() {}
 
@@ -60,10 +59,10 @@ void controlInputsAutonomous() {
 
 	// Control loop
 	while (true) {
-		
+
 		// Autonomous loop, runs only once
 		if (b) {
-			
+
 			// Select correct autonomous program
 			runAutonomous();
 			b = false;
@@ -82,28 +81,11 @@ void runAutonomous() {
 	motorsDriveLeft.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 	motorsDriveRight.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 
-	// Select autonomous program
-	switch (getCurrentAutonomous()) {
-		
-		case 1: // Program #1: Drive Backward
-			runProgram1();
-			break;
-		
-		case 2: // Program #2: 2-Ring Score
-			runProgram2();
-			break;
-		
-		case 3: // Program #3: [n/a]
-			runProgram3();
-			break;
-
-		case 4: // Program #4: Testing
-			runProgram4();
-			break;
-
-		default: // Do Nothing
-			delayA();
-			break;
+	if (getCurrentAutonomous() >= 1 && getCurrentAutonomous() <= 4) {
+		autonomousPrograms[getCurrentAutonomous() - 1]();
+	}
+	else {
+		delayA();
 	}
 
 	// Update brakes
@@ -113,6 +95,17 @@ void runAutonomous() {
 }
 
 void runProgram1() {
+	programPreloadScore();
+	programLadderBackwards();
+}
+
+void runProgram2() {
+	programPreloadScore();
+	programStackScore();
+	programLadder();
+}
+
+void programPreloadScore() {
 
 	// Drive backwards, clamp goal, raise arm, and score the preload
 	releaseGoal();
@@ -123,6 +116,9 @@ void runProgram1() {
 	scoreRingForTime(1000);
 	moveForTime({setTargetArm, setTargetIntake, setTargetScore}, {speedMax, speedIntake, speedScore}, 200);
 	delayA();
+}
+
+void programStackScore() {
 
 	// Turn to face the stack, drive forwards, and score the bottom ring
 	isLeftCorner() ? turnLeftAndScoreForTime(400) : turnRightAndScoreForTime(400); // Corner dependent
@@ -131,7 +127,7 @@ void runProgram1() {
 	scoreRingForTime(500);
 	delayA();
 
-	// Corner dependent	
+	// Corner dependent
 	if (isNegativeCorner()) {
 
 		// Turn to face the stack, drive fowards, and score the bottom left ring
@@ -152,8 +148,10 @@ void runProgram1() {
 		isLeftCorner() ? turnLeftAndScoreForTime(400) : turnRightAndScoreForTime(550);
 		delayA();
 	}
+}
 
-	
+void programLadder() {
+
 	// Drive forwards, drive forwards slowly
 	driveAndScoreRingForTime(speedMax, speedMax, 800);
 	delayA();
@@ -161,7 +159,14 @@ void runProgram1() {
 	delayA();
 }
 
-void runProgram2() { delayA(); }
+void programLadderBackwards() {
+
+	// Drive backwards, drive backwards slowly
+	driveAndScoreRingForTime(-speedMax, -speedMax, 800);
+	delayA();
+	driveAndScoreRingForTime(-50, -50, 800);
+	delayA();
+}
 
 void runProgram3() { delayA(); }
 
@@ -175,6 +180,7 @@ void moveForTime(vector<void (*)(int n)> targets, vector<int> values, int millis
 }
 
 void updateTargetsTo(vector<void (*)(int n)> targets, vector<int> values) {
+
 	// Resets all values
 	for (int i = 0; i < targets.size() && i < values.size(); i++) {
 		targets[i](values[i]);
@@ -190,7 +196,7 @@ void turnLeftAndScoreForTime(int milliseconds) { driveAndScoreRingForTime(-speed
 void turnRightAndScoreForTime(int milliseconds) { driveAndScoreRingForTime(speedMax, -speedMax, milliseconds); }
 void seizeGoal() { setTargetClamp(1); }
 void releaseGoal() { setTargetClamp(0); }
-void delayA(int milliseconds) { (milliseconds < delayAuton) ? delay(delayAuton) : delay(milliseconds); }
+void delayA(int milliseconds) { (milliseconds < delayAutonomous) ? delay(delayAutonomous) : delay(milliseconds); }
 
 // Autonomous Parsing Methods
 int parseDistanceToTime(int speed, int centimeters) { return (10 * centimeters + 60) / (abs(speed) * 0.01); }
@@ -202,8 +208,8 @@ bool isRedCorner() { return getCurrentSide() == 1; }
 bool isBlueCorner() { return getCurrentSide() == 2; }
 bool isPositiveCorner() { return getCurrentPosition() == 1; }
 bool isNegativeCorner() { return getCurrentPosition() == 2; }
-bool isRightCorner() { return getCurrentCorner() % 2 == 0; }
-bool isLeftCorner() {return getCurrentCorner() % 2 != 0; }
+bool isRightCorner() { return getCurrentCorner() == 1 || getCurrentCorner() == 4; }
+bool isLeftCorner() { return getCurrentCorner() == 2 || getCurrentCorner() == 3; }
 
 /* Driver Controlled Period Task */
 void controlInputsDriver() {
@@ -327,12 +333,12 @@ void updateTargetArm() {
 
 void updateTargetIntakeScore() {
 	if (inputsDriver.buttonR1 == 1 && inputsDriver.buttonR2 == 0) {
-		setTargetIntake(90);
-		setTargetScore(80);
+		setTargetIntake(speedIntake);
+		setTargetScore(speedScore);
 	}
 	else if (inputsDriver.buttonR1 == 0 && inputsDriver.buttonR2 == 1) {
-		setTargetIntake(-90);
-		setTargetScore(-80);
+		setTargetIntake(-speedIntake);
+		setTargetScore(-speedScore);
 	}
 	else {
 		setTargetIntake(0);
@@ -344,7 +350,7 @@ void updateTargetClamp() {
 	if (inputsDriver.buttonUp == 1 && inputsDriver.buttonDown == 0) {
 		setTargetClamp(1);
 	}
-	else if (inputsDriver.buttonUp == 0 && inputsDriver.buttonDown == 1){
+	else if (inputsDriver.buttonUp == 0 && inputsDriver.buttonDown == 1) {
 		setTargetClamp(0);
 	}
 }
@@ -353,7 +359,7 @@ void updateTargetPaddle() {
 	if (inputsDriver.buttonLeft == 1 && inputsDriver.buttonRight == 0) {
 		setTargetPaddle(1);
 	}
-	else if (inputsDriver.buttonLeft == 0 && inputsDriver.buttonRight == 1){
+	else if (inputsDriver.buttonLeft == 0 && inputsDriver.buttonRight == 1) {
 		setTargetPaddle(0);
 	}
 }
@@ -382,9 +388,7 @@ void updateInputsRobot() {
 	inputsRobot.velocityL = motorsDriveLeft.get_actual_velocity(0);
 }
 
-void updateActuals() {
-	updateActualDrivetrain();
-}
+void updateActuals() { updateActualDrivetrain(); }
 
 void updateActualDrivetrain() {
 	setActualDriveRight(inputsRobot.velocityR);
@@ -393,7 +397,7 @@ void updateActualDrivetrain() {
 
 /* Robot System Task */
 void controlRobot() {
-	
+
 	// Control loop
 	while (true) {
 
@@ -435,9 +439,7 @@ void updateRobotDrivetrain() {
 	}
 }
 
-void updateRobotArm() {
-	motorsArm.move(getTargetArm());
-}
+void updateRobotArm() { motorsArm.move(getTargetArm()); }
 
 void updateRobotIntakeScore() {
 	motorIntake.move(getTargetIntake());
@@ -465,11 +467,11 @@ void updateRobotPaddle() {
 void updateRobotBrakes() {
 	motorsArm.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 	motorIntake.set_brake_mode_all(MOTOR_BRAKE_HOLD);
-	motorScore.set_brake_mode_all(MOTOR_BRAKE_HOLD); 
+	motorScore.set_brake_mode_all(MOTOR_BRAKE_HOLD);
 }
 
 // Robot Helper Methods
-int PID(int target, int sensor, double kP, double kI, double kD, int* I, int limitI, int* lastError) {
+int PID(int target, int sensor, double kP, double kI, double kD, int *I, int limitI, int *lastError) {
 	int PID = 0;
 	int error = target - sensor;
 
@@ -482,7 +484,7 @@ int PID(int target, int sensor, double kP, double kI, double kD, int* I, int lim
 	}
 
 	// Calculates PID
-	PID = (int) ((kP * error) + (kI + (*I)) + (kD * (error - (*lastError))));
+	PID = (int)((kP * error) + (kI + (*I)) + (kD * (error - (*lastError))));
 
 	// Updates last error
 	*lastError = error;
@@ -496,7 +498,7 @@ void controlDisplay() {
 	// Control loop
 	while (true) {
 
-		if (currentState) { 
+		if (currentState) {
 			updateScreens();
 			updateGameInformation();
 			updateDropdowns();
@@ -552,19 +554,19 @@ void updateGameInformation() {
 
 void updateImages() {
 	switch (getCurrentMode()) {
+	case 1:
+		switch (getCurrentSide()) {
 		case 1:
-			switch (getCurrentSide()) {
-				case 1:
-					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, false);
-					break;
-				case 2:
-					updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, true);
-					break;
-			}
+			updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, false);
 			break;
 		case 2:
-			updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutSkills, 0.64, false);
+			updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutVex, 0.64, true);
 			break;
+		}
+		break;
+	case 2:
+		updateImageTo(&imgAutonomousLayout, 295, 55, &dscImgLayoutSkills, 0.64, false);
+		break;
 	}
 }
 
@@ -578,24 +580,22 @@ void updateDropdowns() {
 		setCurrentMode(n);
 
 		switch (getCurrentMode()) {
-			case 1:
-				updateDropdownOptionsTo(&dropdownAutonomousSide, "Red\nBlue");
-				break;
-			case 2:
-				updateDropdownOptionsTo(&dropdownAutonomousSide, "Red");
-				break;
+		case 1:
+			updateDropdownOptionsTo(&dropdownAutonomousSide, "Red\nBlue");
+			break;
+		case 2:
+			updateDropdownOptionsTo(&dropdownAutonomousSide, "Red");
+			break;
 		}
 	}
 }
 
-void updateDropdownOptionsTo(lv_obj_t **dropdown, string options) {
-	lv_dropdown_set_options(*dropdown, options.c_str());
-}
+void updateDropdownOptionsTo(lv_obj_t **dropdown, string options) { lv_dropdown_set_options(*dropdown, options.c_str()); }
 
 void updateImageTo(lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom, bool flipped) {
 	lv_img_set_src(*image, src);
 	lv_img_set_pivot(*image, 0, 0);
-	lv_img_set_zoom(*image, ((int) (256 * zoom)));
+	lv_img_set_zoom(*image, ((int)(256 * zoom)));
 	if (flipped) {
 		lv_img_set_angle(*image, 1800);
 		lv_obj_align(*image, LV_ALIGN_TOP_LEFT, x + lv_obj_get_width(*image) * zoom, y + lv_obj_get_height(*image) * zoom);
@@ -616,54 +616,35 @@ void updateTexts() {
 	string empty = "";
 
 	// Main Menu
-    updateTextLabelTo(&textMainInfo, empty +
-		"Mode: " + parseCurrentMode() + "\n" +
-		"Period: " + parseCurrentPeriod() + "\n" +
-		"Side: " + parseCurrentSide()  + "\n" +
-		"Start Position: " + parseCurrentPosition() + "\n" +
-		"Selected Autonomous: " + parseCurrentAutonomous());
-	
+	updateTextLabelTo(&textMainInfo, empty + "Mode: " + parseCurrentMode() + "\n" + "Period: " + parseCurrentPeriod() + "\n" + "Side: " + parseCurrentSide() + "\n" + "Start Position: " + parseCurrentPosition() + "\n" +
+										 "Selected Autonomous: " + parseCurrentAutonomous());
+
 	// Autonomous
 	if (!getToggleManualAutonomous()) {
-		updateTextLabelTo(&textAutonomousManual, empty +
-			"Manual Autonomous");
+		updateTextLabelTo(&textAutonomousManual, empty + "Manual Autonomous");
 	}
 	else {
-		updateTextLabelTo(&textAutonomousManual, empty +
-			"Autonomous Running");
+		updateTextLabelTo(&textAutonomousManual, empty + "Autonomous Running");
 	}
 
 	// Electronics
-	updateTextTableTo(&tableElectronicsMotors,
-		{40, 90, 50, 50}, {
-		{"Port", "Description", "Targets", "Actuals"},
-		{"1", "Right Drive", to_string(getTargetDriveRight()), to_string(getActualDriveRight())},
-		{"2", "Right Drive", to_string(getTargetDriveRight()), to_string(getActualDriveRight())},
-		{"-9", "Left Drive", to_string(getTargetDriveLeft()), to_string(getActualDriveLeft())},
-		{"-10", "Left Drive", to_string(getTargetDriveLeft()), to_string(getActualDriveLeft())},
-		{"7", "Intake", to_string(getTargetIntake()), ""}, 
-		{"8", "Score", to_string(getTargetScore()), ""}, 
-		{"", "", "", ""},
-		{"", "", "", ""},
-		{"", "", "", ""}});
-	
-	updateTextTableTo(&tableElectronicsADI,
-		{40, 90, 50}, {
-		{"Port", "Description", "Targets"},
-		{"A", "Pneumatics", to_string(getTargetClamp())},
-		{"B", "", ""},
-		{"C", "", ""},
-		{"D", "", ""},
-		{"E", "", ""},
-		{"F", "", ""},
-		{"G", "", ""},
-		{"H", "", ""},
-		{"21", "Radio", ""}});
+	updateTextTableTo(&tableElectronicsMotors, {40, 90, 50, 50},
+					  {{"Port", "Description", "Targets", "Actuals"},
+					   {"1", "Right Drive", to_string(getTargetDriveRight()), to_string(getActualDriveRight())},
+					   {"2", "Right Drive", to_string(getTargetDriveRight()), to_string(getActualDriveRight())},
+					   {"-9", "Left Drive", to_string(getTargetDriveLeft()), to_string(getActualDriveLeft())},
+					   {"-10", "Left Drive", to_string(getTargetDriveLeft()), to_string(getActualDriveLeft())},
+					   {"7", "Intake", to_string(getTargetIntake()), ""},
+					   {"8", "Score", to_string(getTargetScore()), ""},
+					   {"", "", "", ""},
+					   {"", "", "", ""},
+					   {"", "", "", ""}});
+
+	updateTextTableTo(&tableElectronicsADI, {40, 90, 50},
+					  {{"Port", "Description", "Targets"}, {"A", "Pneumatics", to_string(getTargetClamp())}, {"B", "", ""}, {"C", "", ""}, {"D", "", ""}, {"E", "", ""}, {"F", "", ""}, {"G", "", ""}, {"H", "", ""}, {"21", "Radio", ""}});
 }
 
-void updateTextLabelTo(lv_obj_t **label, string text) {
-	lv_label_set_text(*label, text.c_str());
-}
+void updateTextLabelTo(lv_obj_t **label, string text) { lv_label_set_text(*label, text.c_str()); }
 
 void updateTextTableTo(lv_obj_t **table, vector<int> widths, vector<vector<string>> text) {
 
@@ -675,14 +656,12 @@ void updateTextTableTo(lv_obj_t **table, vector<int> widths, vector<vector<strin
 		for (int c = 0; c < lv_table_get_col_cnt(*table) && c < text[0].size(); c++) {
 			lv_table_set_cell_value(*table, r, c, text[r][c].c_str());
 		}
-	}	
+	}
 }
 
-void updateController() {
-	masterController.print(0, 0, (to_string(getMaxTemp()) + "°C").c_str()); 
-}
+void updateController() { masterController.print(0, 0, (to_string(getMaxTemp()) + "°C").c_str()); }
 
-// Display Initializaiton Methods
+// Display Initialization Methods
 void initializeAllGraphics() {
 	initializeColors();
 	initializeFonts();
@@ -709,7 +688,7 @@ void initializeFonts() {
 	LV_FONT_DECLARE(fauna_14);
 	LV_FONT_DECLARE(calibri_13);
 	LV_FONT_DECLARE(calibri_11);
-	
+
 	createFont(&fontTrajan40, trajan_40);
 	createFont(&fontFauna14, fauna_14);
 	createFont(&fontCalibri13, calibri_13);
@@ -721,7 +700,7 @@ void initializeDSCs() {
 	LV_IMG_DECLARE(icon_spartan_helmet_gold);
 	LV_IMG_DECLARE(layout_vex);
 	LV_IMG_DECLARE(layout_skills);
-	
+
 	createDscImg(&dscImgSpartanHelmetGreen, icon_spartan_helmet);
 	createDscImg(&dscImgSpartanHelmetGold, icon_spartan_helmet_gold);
 	createDscImg(&dscImgLayoutVex, layout_vex);
@@ -750,7 +729,7 @@ void initializeAllScreens() {
 	createScreen(&screenInformation);
 
 	lv_disp_load_scr(screenMainMenu);
-	
+
 	initializeHeader();
 	initializeScreenMain();
 	initializeScreenAutonomous();
@@ -808,36 +787,25 @@ void initializeText() {
 	string empty = "";
 
 	// Header
-	updateTextLabelTo(&textHeader1, empty +
-		"6526-E");
-	updateTextLabelTo(&textHeader2, empty +
-		"E-is-for-Edward\nDamien Robotics");
+	updateTextLabelTo(&textHeader1, empty + "6526-E");
+	updateTextLabelTo(&textHeader2, empty + "E-is-for-Edward\nDamien Robotics");
 
 	// Information
-	updateTextLabelTo(&textInfoGame, empty +
-		"VEX V5 Robotics Competition        \n" +
-		"2024-2025 Game: High Stakes");
-	updateTextLabelTo(&textInfoCoaches, empty +
-		"Coaches: Ms. Maricic, Mr. Geiger,\n" +
-		"Mr. Bikmaz, Mr. McElrea, Paige,\n" +
-		"and others.");
-	updateTextLabelTo(&textInfoCode, empty +
-		"Programmed in C++ using the       \n" +
-		"PROS framework and the LVGL\n" +
-		"graphics library by Teddy.");
+	updateTextLabelTo(&textInfoGame, empty + "VEX V5 Robotics Competition        \n" + "2024-2025 Game: High Stakes");
+	updateTextLabelTo(&textInfoCoaches, empty + "Coaches: Ms. Maricic, Mr. Geiger,\n" + "Mr. Bikmaz, Mr. McElrea, Paige,\n" + "and others.");
+	updateTextLabelTo(&textInfoCode, empty + "Programmed in C++ using the       \n" + "PROS framework and the LVGL\n" + "graphics library by Teddy.");
 
-	updateTextTableTo(&tableInfoTeam,
-		{95, 40, 120}, {
-		{"Name", "Grade", "Role"},
-		{"Edward Deng", "12", "Lead Builder"},
-		{"Andres Gomez", "10", "Builder, Driver"},
-		{"Aidan Reyes", "10", "Programmer, Builder"},
-		{"Rylan Robles", "12", "Lead Driver, Builder"},
-		{"Teddy Wachtler", "12", "Lead Programmer"},
-		{"", "", ""},
-		{"", "", ""},
-		{"", "", ""},
-		{"", "", ""}});
+	updateTextTableTo(&tableInfoTeam, {95, 40, 120},
+					  {{"Name", "Grade", "Role"},
+					   {"Edward Deng", "12", "Lead Builder"},
+					   {"Andres Gomez", "10", "Builder, Driver"},
+					   {"Aidan Reyes", "10", "Programmer, Builder"},
+					   {"Rylan Robles", "12", "Lead Driver, Builder"},
+					   {"Teddy Wachtler", "12", "Lead Programmer"},
+					   {"", "", ""},
+					   {"", "", ""},
+					   {"", "", ""},
+					   {"", "", ""}});
 }
 
 // Display Creation Methods
@@ -847,9 +815,9 @@ void createDscImg(lv_img_dsc_t *dsc, lv_img_dsc_t source) { *dsc = source; }
 
 void createDscRect(lv_draw_rect_dsc_t *dsc, lv_color_t bgColor, int borderWidth, lv_color_t borderColor) {
 	lv_draw_rect_dsc_init(dsc);
-    (*dsc).bg_color = bgColor;
+	(*dsc).bg_color = bgColor;
 	(*dsc).border_width = borderWidth;
-    (*dsc).border_color = borderColor;
+	(*dsc).border_color = borderColor;
 }
 
 void createScreen(lv_obj_t **screen) { *screen = lv_obj_create(NULL); }
@@ -861,7 +829,7 @@ void createTextStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColo
 }
 
 void createButtonStyle(lv_style_t *style, lv_font_t *textFont, lv_color_t textColor, lv_color_t bgColor, lv_color_t borderColor) {
-	lv_style_init(style); 
+	lv_style_init(style);
 	lv_style_set_text_font(style, textFont);
 	lv_style_set_text_color(style, textColor);
 	lv_style_set_bg_color(style, bgColor);
@@ -897,7 +865,7 @@ void createCanvas(int screen, lv_obj_t **canvas, int x, int y, int width, int he
 
 	*canvas = lv_canvas_create(getScreenAt(screen));
 	lv_obj_align(*canvas, LV_ALIGN_TOP_LEFT, x, y);
-    lv_canvas_set_buffer(*canvas, bufferAll, width, height, LV_IMG_CF_TRUE_COLOR);
+	lv_canvas_set_buffer(*canvas, bufferAll, width, height, LV_IMG_CF_TRUE_COLOR);
 }
 
 void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, double zoom) {
@@ -907,8 +875,8 @@ void createImage(int screen, lv_obj_t **image, int x, int y, lv_img_dsc_t *src, 
 
 void createLabel(int screen, lv_obj_t **label, int x, int y, lv_style_t *style) {
 	*label = lv_label_create(getScreenAt(screen));
-    lv_obj_add_style(*label, style, 0);
-    lv_obj_align(*label, LV_ALIGN_TOP_LEFT, x, y);
+	lv_obj_add_style(*label, style, 0);
+	lv_obj_align(*label, LV_ALIGN_TOP_LEFT, x, y);
 	lv_label_set_text(*label, "Text");
 }
 
@@ -930,7 +898,7 @@ void createDropdown(int screen, lv_obj_t **dropdown, string options, int x, int 
 	lv_obj_align(*dropdown, LV_ALIGN_TOP_LEFT, x, y);
 }
 
-void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int width, int height, void(*function)(lv_event_t *event)) {
+void createButton(int screen, lv_obj_t **button, lv_obj_t **label, int x, int y, int width, int height, void (*function)(lv_event_t *event)) {
 	*button = lv_btn_create(getScreenAt(screen));
 	lv_obj_set_size(*button, width, height);
 	lv_obj_align(*button, LV_ALIGN_TOP_LEFT, x, y);
@@ -956,24 +924,24 @@ void createTable(int screen, lv_obj_t **table, int x, int y, int rows, int colum
 	lv_obj_add_style(*table, &styleTableCell, LV_PART_ITEMS);
 	lv_table_set_row_cnt(*table, rows);
 	lv_table_set_col_cnt(*table, columns);
-	lv_obj_add_event_cb(*table, eventTableFormat, LV_EVENT_DRAW_PART_BEGIN, NULL); 
+	lv_obj_add_event_cb(*table, eventTableFormat, LV_EVENT_DRAW_PART_BEGIN, NULL);
 }
 
 // Display Event Methods
 void eventTableFormat(lv_event_t *event) {
-    lv_obj_t *table = lv_event_get_target(event);
-    lv_obj_draw_part_dsc_t *dscCell = lv_event_get_draw_part_dsc(event);
+	lv_obj_t *table = lv_event_get_target(event);
+	lv_obj_draw_part_dsc_t *dscCell = lv_event_get_draw_part_dsc(event);
 	lv_draw_rect_dsc_t *dscRectCell = (*dscCell).rect_dsc;
 
-    if ((*dscCell).part == LV_PART_ITEMS) {
-    	int r = (*dscCell).id /  lv_table_get_col_cnt(table);
-    	int c = (*dscCell).id - r * lv_table_get_col_cnt(table);
-    	
+	if ((*dscCell).part == LV_PART_ITEMS) {
+		int r = (*dscCell).id / lv_table_get_col_cnt(table);
+		int c = (*dscCell).id - r * lv_table_get_col_cnt(table);
+
 		if (r % 2 == 1) {
-        	(*dscRectCell).bg_color = colorLightGray;
-            (*dscRectCell).bg_opa = LV_OPA_COVER;
-    	}
-    }
+			(*dscRectCell).bg_color = colorLightGray;
+			(*dscRectCell).bg_opa = LV_OPA_COVER;
+		}
+	}
 }
 
 void eventAutonomousManual(lv_event_t *event) {
@@ -991,86 +959,102 @@ void eventAutonomousManual(lv_event_t *event) {
 // Display Parsing Methods
 string parseCurrentMode() {
 	switch (getCurrentMode()) {
-		case 1: return "Competition";
-		case 2: return "Skills";
-		default: return "Unknown";
+	case 1:
+		return "Competition";
+	case 2:
+		return "Skills";
+	default:
+		return "Unknown";
 	}
 }
 
 string parseCurrentPeriod() {
 	switch (getCurrentPeriod()) {
-		case -1: return "Disabled";
-		case 1: return "Enabled";
-		case 2: return "Driver Controlled";
-		case 3: return "Autonomous Controlled";
-		default: return "Unknown";
+	case -1:
+		return "Disabled";
+	case 1:
+		return "Enabled";
+	case 2:
+		return "Driver Controlled";
+	case 3:
+		return "Autonomous Controlled";
+	default:
+		return "Unknown";
 	}
 }
 
 string parseCurrentSide() {
 	switch (getCurrentSide()) {
-		case 1: return "Red      ";
-		case 2: return "Blue     ";
-		default: return "Unknown";
+	case 1:
+		return "Red      ";
+	case 2:
+		return "Blue     ";
+	default:
+		return "Unknown";
 	}
 }
 
 string parseCurrentPosition() {
 	switch (getCurrentPosition()) {
-		case 1: return "Positive";
-		case 2: return "Negative";
-		default: return "Unknown";
+	case 1:
+		return "Positive";
+	case 2:
+		return "Negative";
+	default:
+		return "Unknown";
 	}
 }
 
 string parseCurrentAutonomous() {
 	switch (getCurrentAutonomous()) {
-		case 1: return "Program #1: Drive Backward";
-		case 2: return "Program #2: 2-Ring Score";
-		case 3: return "Program #3: [n/a]";
-		case 4: return "Program #4: Testing";
-		default: return "Unknown";
+	case 1:
+		return "Program #1: Drive Backward";
+	case 2:
+		return "Program #2: 2-Ring Score";
+	case 3:
+		return "Program #3: [n/a]";
+	case 4:
+		return "Program #4: Testing";
+	default:
+		return "Unknown";
 	}
 }
 
 string parseCurrentScreen() {
 	switch (getCurrentScreen()) {
-		case 0: return "Main Menu";
-		case 1: return "Autonomous";
-		case 2: return "Electronics";
-		case 3: return "Information";
-		default: return "Unknown";
+	case 0:
+		return "Main Menu";
+	case 1:
+		return "Autonomous";
+	case 2:
+		return "Electronics";
+	case 3:
+		return "Information";
+	default:
+		return "Unknown";
 	}
 }
 
 // Display Helper Methods
 int getMaxTemp() {
-	return max({
-		motorsDriveLeft.get_temperature(0),
-		motorsDriveLeft.get_temperature(1), 
-		motorsDriveRight.get_temperature(0), 
-		motorsDriveRight.get_temperature(1),
-		motorsArm.get_temperature(0),
-		motorsArm.get_temperature(1),
-		motorScore.get_temperature(0), 
-		motorIntake.get_temperature(0)
-		});
+	return max({motorsDriveLeft.get_temperature(0), motorsDriveLeft.get_temperature(1), motorsDriveRight.get_temperature(0), motorsDriveRight.get_temperature(1), motorsArm.get_temperature(0), motorsArm.get_temperature(1),
+				motorScore.get_temperature(0), motorIntake.get_temperature(0)});
 }
 
-lv_obj_t* getScreenAt(int screen) {
+lv_obj_t *getScreenAt(int screen) {
 	switch (screen) {
-		case -1:
-			return lv_scr_act();
-		case 0:
-			return screenMainMenu;
-		case 1:
-			return screenAutonomous;
-		case 2:
-			return screenElectronics;
-		case 3:
-			return screenInformation;
-		default:
-			return screenMainMenu;
+	case -1:
+		return lv_scr_act();
+	case 0:
+		return screenMainMenu;
+	case 1:
+		return screenAutonomous;
+	case 2:
+		return screenElectronics;
+	case 3:
+		return screenInformation;
+	default:
+		return screenMainMenu;
 	}
 }
 
